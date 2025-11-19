@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk 
 import os 
+from main_view import run_main_app
 
 # --- SIMULACIÓN DE MÓDULOS ---
 # Simula el controlador de autenticación (auth_controller.py)
@@ -143,7 +144,9 @@ class LoginApp:
         # Llama a la función de tu auth_controller.py
         if validar_credenciales(usuario, password):
             messagebox.showinfo("Acceso concedido", f"Bienvenido {usuario}!")
+            # Cerrar la ventana de login y abrir la ventana principal
             self.root.destroy()
+            run_main_app()
         else:
             messagebox.showerror("Acceso denegado", "Usuario o contraseña incorrectos.")
 
