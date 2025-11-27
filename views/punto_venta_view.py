@@ -65,7 +65,10 @@ class PuntoVentaView(tk.Frame):
         ).pack(anchor="w")
 
         # Productos provenientes del controller
-        for nombre, precio in self.controller.productos:
+        for producto in self.controller.productos:
+            nombre = producto['nombre']
+            precio = producto['precio']
+            
             item_frame = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
             item_frame.pack(fill=tk.X, pady=5)
 
@@ -304,5 +307,14 @@ class PuntoVentaView(tk.Frame):
         self.total_label.config(text=f"Total a Pagar: $ {total:.2f}")
 
     def _completar_venta(self):
-        self.controller.limpiar_carrito()
-        self._render_carrito()
+        from tkinter import messagebox
+        id_venta = self.controller.procesar_venta()
+        
+        if id_venta:
+            messagebox.showinfo("Venta Exitosa", f"Venta registrada correctamente.\nID: {id_venta}")
+            self._render_carrito()
+        else:
+            if not self.controller.carrito:
+                messagebox.showwarning("Carrito Vacío", "Agregue productos antes de completar la venta.")
+            else:
+                messagebox.showerror("Error", "Ocurrió un error al procesar la venta.")
