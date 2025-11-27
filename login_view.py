@@ -1,22 +1,3 @@
-import tkinter as tk
-from tkinter import messagebox
-from PIL import Image, ImageTk 
-import os 
-from main_view import run_main_app
-
-# --- SIMULACIÓN DE MÓDULOS ---
-# Simula el controlador de autenticación (auth_controller.py)
-# Reemplaza esto con tu importación real: from auth_controller import validar_credenciales
-def validar_credenciales(usuario, password):
-    # Lógica de validación dummy
-    return usuario == "admin" and password == "admin123"
-# --- FIN DE SIMULACIÓN ---
-
-
-class LoginApp:
-    # Paleta de colores basada en la imagen
-    COLOR_FONDO_EXTERIOR = "#C7B299" 
-    COLOR_FONDO_INTERIOR = "#D7C2A9"
     COLOR_TEXTO_PRIMARIO = "#333333"
     COLOR_BOTON_FONDO = "#FDB813"
     COLOR_BOTON_TEXTO = "white"

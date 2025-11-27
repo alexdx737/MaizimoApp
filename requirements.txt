@@ -1,2 +1,10 @@
-mysql-connector-python
+# Supabase and Database
+supabase
+psycopg2-binary
+python-dotenv
+
+# UI
 Pillow
+
+# Security
+bcrypt

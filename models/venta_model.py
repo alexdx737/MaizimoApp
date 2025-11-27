@@ -1,0 +1,200 @@
+"""
+Venta Model - Sales management
+"""
+from database import get_supabase_client
+from datetime import datetime, date, time
+from models.producto_model import ProductoModel
+
+class VentaModel:
+    """Model for venta and venta_completa tables"""
+    
+    @staticmethod
+    def crear_venta_completa(id_cliente, monto_total, descuento_bolsa=False, 
+                            descripcion=None, fecha=None, hora=None):
+        """
+        Create a complete sale record
+        Args:
+            id_cliente: Client ID
+            monto_total: Total amount
+            descuento_bolsa: Bag discount applied
+            descripcion: Optional description
+            fecha: Sale date (default: today)
+            hora: Sale time (default: now)
+        Returns: Created venta_completa or None
+        """
+        try:
+            supabase = get_supabase_client()
+            
+            if fecha is None:
+                fecha = date.today().isoformat()
+            if hora is None:
+                hora = datetime.now().time().isoformat()
+            
+            data = {
+                'fecha': fecha,
+                'monto_total': monto_total,
+                'id_cliente': id_cliente,
+                'hora': hora,
+                'descuento_bolsa': descuento_bolsa,
+                'descripcion': descripcion
+            }
+            
+            response = supabase.table('venta_completa').insert(data).execute()
+            return response.data[0] if response.data else None
+            
+        except Exception as e:
+            print(f"Error creando venta completa: {e}")
+            return None
+    
+    @staticmethod
+    def agregar_item_venta(id_venta_completa, id_producto, cantidad_vendida, 
+                          unidad_medida, subtotal):
+        """
+        Add an item to a sale
+        Args:
+            id_venta_completa: Complete sale ID
+            id_producto: Product ID
+            cantidad_vendida: Quantity sold
+            unidad_medida: Unit of measure
+            subtotal: Item subtotal
+        Returns: Created venta item or None
+        """
+        try:
+            supabase = get_supabase_client()
+            
+            data = {
+                'id_producto': id_producto,
+                'cantidad_vendida': cantidad_vendida,
+                'unidad_medida': unidad_medida,
+                'subtotal': subtotal,
+                'id_venta_completa': id_venta_completa
+            }
+            
+            response = supabase.table('venta').insert(data).execute()
+            
+            # Update product stock
+            if response.data:
+                ProductoModel.actualizar_stock(id_producto, -cantidad_vendida)
+            
+            return response.data[0] if response.data else None
+            
+        except Exception as e:
+            print(f"Error agregando item a venta: {e}")
+            return None
+    
+    @staticmethod
+    def procesar_venta(carrito, id_cliente, descuento_bolsa=False, redondeo=False):
+        """
+        Process a complete sale with multiple items
+        Args:
+            carrito: List of cart items [{id_producto, cantidad, precio, nombre}]
+            id_cliente: Client ID
+            descuento_bolsa: Apply bag discount
+            redondeo: Apply rounding for donation
+        Returns: venta_completa ID or None
+        """
+        try:
+            # Calculate total
+            subtotal = sum(item['precio'] * item['cantidad'] for item in carrito)
+            
+            # Apply bag discount
+            descuento = 2.0 if descuento_bolsa and subtotal >= 2.0 else 0.0
+            subtotal_desc = max(subtotal - descuento, 0.0)
+            
+            # Apply rounding
+            if redondeo and subtotal_desc > 0:
+                total_redondeado = float(int(subtotal_desc + 0.9999))
+                monto_redondeo = total_redondeado - subtotal_desc
+            else:
+                total_redondeado = subtotal_desc
+                monto_redondeo = 0.0
+            
+            # Create venta_completa
+            venta_completa = VentaModel.crear_venta_completa(
+                id_cliente=id_cliente,
+                monto_total=total_redondeado,
+                descuento_bolsa=descuento_bolsa,
+                descripcion=f"Venta con {len(carrito)} productos"
+            )
+            
+            if not venta_completa:
+                return None
+            
+            id_venta_completa = venta_completa['id_venta_completa']
+            
+            # Add each item
+            for item in carrito:
+                item_subtotal = item['precio'] * item['cantidad']
+                VentaModel.agregar_item_venta(
+                    id_venta_completa=id_venta_completa,
+                    id_producto=item['id_producto'],
+                    cantidad_vendida=item['cantidad'],
+                    unidad_medida=item.get('unidad_medida', 'pz'),
+                    subtotal=item_subtotal
+                )
+            
+            # Create donation if rounding was applied
+            if monto_redondeo > 0:
+                from models.donacion_model import DonacionModel
+                DonacionModel.crear(id_venta_completa, monto_redondeo)
+            
+            return id_venta_completa
+            
+        except Exception as e:
+            print(f"Error procesando venta: {e}")
+            return None
+    
+    @staticmethod
+    def obtener_venta_completa(id_venta_completa):
+        """Get complete sale with all items"""
+        try:
+            supabase = get_supabase_client()
+            
+            # Get venta_completa
+            response = supabase.table('venta_completa')\
+                .select('*, cliente(*)')\
+                .eq('id_venta_completa', id_venta_completa)\
+                .execute()
+            
+            if not response.data:
+                return None
+            
+            venta = response.data[0]
+            
+            # Get items
+            items_response = supabase.table('venta')\
+                .select('*, producto(*)')\
+                .eq('id_venta_completa', id_venta_completa)\
+                .execute()
+            
+            venta['items'] = items_response.data
+            
+            return venta
+            
+        except Exception as e:
+            print(f"Error obteniendo venta completa: {e}")
+            return None
+    
+    @staticmethod
+    def listar_ventas(fecha_inicio=None, fecha_fin=None, limit=100):
+        """List sales with optional date filter"""
+        try:
+            supabase = get_supabase_client()
+            
+            query = supabase.table('venta_completa')\
+                .select('*, cliente(*)')\
+                .order('fecha', desc=True)\
+                .order('hora', desc=True)\
+                .limit(limit)
+            
+            if fecha_inicio:
+                query = query.gte('fecha', fecha_inicio)
+            if fecha_fin:
+                query = query.lte('fecha', fecha_fin)
+            
+            response = query.execute()
+            return response.data
+            
+        except Exception as e:
+            print(f"Error listando ventas: {e}")
+            return []

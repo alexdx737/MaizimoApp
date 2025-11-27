@@ -2,35 +2,67 @@ class PuntoVentaController:
     """Controller de la sección Punto de Venta.
 
     Maneja el estado del carrito, descuentos y cálculo de totales.
-    Por ahora trabaja solo en memoria; más adelante puede conectarse a modelos/BD.
+    Conectado a Supabase para productos y ventas.
     """
 
     def __init__(self):
-        # Lista de productos disponibles (nombre, precio)
-        self.productos = [
-            ("Tortillas (kg)", 25.0),
-            ("Tostadas (paquete)", 15.0),
-            ("Chips (bolsa)", 20.0),
-            ("Tamales", 12.0),
-        ]
+        from models.producto_model import ProductoModel
+        from models.venta_model import VentaModel
+        
+        self.ProductoModel = ProductoModel
+        self.VentaModel = VentaModel
+        
+        # Cargar productos desde Supabase
+        self.productos = []
+        self.cargar_productos()
 
-        # Carrito: lista de dicts {nombre, precio, cantidad}
+        # Carrito: lista de dicts {id_producto, nombre, precio, cantidad, unidad_medida}
         self.carrito = []
 
         self.bolsa = False
         self.redondeo = False
+    
+    def cargar_productos(self):
+        """Cargar productos desde Supabase"""
+        try:
+            productos_db = self.ProductoModel.listar_todos()
+            self.productos = [
+                {
+                    'id_producto': p['id_producto'],
+                    'nombre': p['nombre'],
+                    'precio': float(p['costo_unitario']),
+                    'stock': float(p['stock']),
+                    'unidad_medida': p['unidad_medida']
+                }
+                for p in productos_db
+            ]
+        except Exception as e:
+            print(f"Error cargando productos: {e}")
+            # Fallback a productos por defecto
+            self.productos = [
+                {'id_producto': 1, 'nombre': 'Tortillas (kg)', 'precio': 25.0, 'stock': 100, 'unidad_medida': 'kg'},
+                {'id_producto': 2, 'nombre': 'Tostadas (paquete)', 'precio': 15.0, 'stock': 50, 'unidad_medida': 'pz'},
+                {'id_producto': 3, 'nombre': 'Chips (bolsa)', 'precio': 20.0, 'stock': 30, 'unidad_medida': 'pz'},
+                {'id_producto': 4, 'nombre': 'Tamales', 'precio': 12.0, 'stock': 25, 'unidad_medida': 'pz'},
+            ]
 
     # --- Operaciones sobre el carrito ---
     def agregar_al_carrito(self, nombre):
-        precio = self._obtener_precio(nombre)
-        if precio is None:
+        producto = self._obtener_producto(nombre)
+        if producto is None:
             return
         for item in self.carrito:
             if item["nombre"] == nombre:
                 item["cantidad"] += 1
                 break
         else:
-            self.carrito.append({"nombre": nombre, "precio": precio, "cantidad": 1})
+            self.carrito.append({
+                "id_producto": producto['id_producto'],
+                "nombre": producto['nombre'],
+                "precio": producto['precio'],
+                "cantidad": 1,
+                "unidad_medida": producto['unidad_medida']
+            })
 
     def cambiar_cantidad(self, indice, delta):
         if indice < 0 or indice >= len(self.carrito):
@@ -68,9 +100,46 @@ class PuntoVentaController:
 
         return subtotal, total_redondeado
 
+    def procesar_venta(self, id_cliente=1):
+        """
+        Procesar y guardar la venta en Supabase
+        Args:
+            id_cliente: ID del cliente (default: 1 para cliente general)
+        Returns: ID de venta_completa o None
+        """
+        if not self.carrito:
+            print("Carrito vacío, no se puede procesar venta")
+            return None
+        
+        try:
+            id_venta = self.VentaModel.procesar_venta(
+                carrito=self.carrito,
+                id_cliente=id_cliente,
+                descuento_bolsa=self.bolsa,
+                redondeo=self.redondeo
+            )
+            
+            if id_venta:
+                print(f"✓ Venta procesada exitosamente: ID {id_venta}")
+                self.limpiar_carrito()
+                return id_venta
+            else:
+                print("✗ Error procesando venta")
+                return None
+                
+        except Exception as e:
+            print(f"Error en procesar_venta: {e}")
+            return None
+
     # --- Helpers internos ---
-    def _obtener_precio(self, nombre):
-        for n, p in self.productos:
-            if n == nombre:
-                return p
+    def _obtener_producto(self, nombre):
+        """Obtener producto completo por nombre"""
+        for producto in self.productos:
+            if producto['nombre'] == nombre:
+                return producto
         return None
+    
+    def _obtener_precio(self, nombre):
+        """Obtener precio de producto por nombre (legacy)"""
+        producto = self._obtener_producto(nombre)
+        return producto['precio'] if producto else None
