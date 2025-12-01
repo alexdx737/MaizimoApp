@@ -182,7 +182,7 @@ class VentaModel:
             supabase = get_supabase_client()
             
             query = supabase.table('venta_completa')\
-                .select('*, cliente(*)')\
+                .select('*, cliente(*), donacion(*)')\
                 .order('fecha', desc=True)\
                 .order('hora', desc=True)\
                 .limit(limit)

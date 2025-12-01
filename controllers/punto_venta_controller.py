@@ -143,3 +143,44 @@ class PuntoVentaController:
         """Obtener precio de producto por nombre (legacy)"""
         producto = self._obtener_producto(nombre)
         return producto['precio'] if producto else None
+
+    def obtener_historial_ventas(self):
+        """Obtener historial completo de ventas formateado para la vista"""
+        ventas = self.VentaModel.listar_ventas(limit=50) # Limit 50 for now, maybe more? User said "historial de ventas", not just today.
+        
+        datos_formateados = []
+        for v in ventas:
+            # Formatear fecha y hora
+            fecha = v.get('fecha', '')
+            hora = v.get('hora', '')[:5] if v.get('hora') else ''
+            
+            # Formatear total
+            total = float(v.get('monto_total', 0))
+            
+            # Verificar donación
+            donaciones = v.get('donacion', [])
+            # Supabase might return None, [], or object. Handle list.
+            if isinstance(donaciones, list) and len(donaciones) > 0:
+                redondeo = "Sí"
+                monto_donacion = float(donaciones[0].get('monto_redondeo', 0))
+            elif isinstance(donaciones, dict): # Should not happen with 1:N but just in case
+                redondeo = "Sí"
+                monto_donacion = float(donaciones.get('monto_redondeo', 0))
+            else:
+                redondeo = "No"
+                monto_donacion = 0.0
+                
+            datos_formateados.append((
+                v['id_venta_completa'],
+                fecha,
+                hora,
+                f"${total:.2f}",
+                redondeo,
+                f"${monto_donacion:.2f}"
+            ))
+            
+        return datos_formateados
+
+    def obtener_detalle_venta(self, id_venta):
+        """Obtener detalle completo de una venta"""
+        return self.VentaModel.obtener_venta_completa(id_venta)

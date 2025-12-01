@@ -163,6 +163,37 @@ class PuntoVentaView(tk.Frame):
         )
         self.total_label.pack(anchor="e", pady=(8, 4))
 
+        # Pago y Cambio
+        pago_frame = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        pago_frame.pack(fill=tk.X, pady=(5, 0))
+
+        tk.Label(
+            pago_frame,
+            text="Pago con:",
+            font=("Arial", 10),
+            fg=self.app.COLOR_TEXTO_PRIMARIO,
+            bg=self.app.COLOR_FONDO_INTERIOR,
+        ).pack(side=tk.LEFT)
+
+        self.pago_var = tk.StringVar(value="0")
+        self.pago_entry = tk.Entry(
+            pago_frame,
+            textvariable=self.pago_var,
+            font=("Arial", 10),
+            width=10
+        )
+        self.pago_entry.pack(side=tk.LEFT, padx=5)
+        self.pago_entry.bind("<KeyRelease>", lambda e: self._recalcular_totales())
+
+        self.cambio_label = tk.Label(
+            carrito_frame,
+            text="Cambio: $0.00",
+            font=("Arial", 11, "bold"),
+            fg=self.app.COLOR_TEXTO_PRIMARIO,
+            bg=self.app.COLOR_FONDO_INTERIOR,
+        )
+        self.cambio_label.pack(anchor="e", pady=(5, 4))
+
         tk.Button(
             carrito_frame,
             text="Completar Venta",
@@ -185,27 +216,32 @@ class PuntoVentaView(tk.Frame):
 
         tk.Label(
             historial_frame,
-            text="Historial de Ventas del Día",
+            text="Historial de Ventas",
             font=("Arial", 12, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w", pady=(0, 10))
 
-        columnas = ("fecha", "hora", "total", "redondeo", "donacion")
-        tree = ttk.Treeview(historial_frame, columns=columnas, show="headings", height=4)
-        for col, texto in zip(columnas, ["Fecha", "Hora", "Total", "Redondeo", "Donación"]):
-            tree.heading(col, text=texto)
-            tree.column(col, width=100, anchor="center")
+        # Container for tree and scrollbar
+        tree_container = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        tree_container.pack(fill=tk.BOTH, expand=True)
 
-        tree.pack(fill=tk.BOTH, expand=True)
+        scrollbar = tk.Scrollbar(tree_container)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        datos_demo = [
-            ("2024-11-04", "09:15", "$75.00", "Sí", "$0.50"),
-            ("2024-11-04", "10:30", "$128.00", "Sí", "$0.75"),
-            ("2024-11-04", "11:45", "$50.00", "No", "$0.00"),
-        ]
-        for fila in datos_demo:
-            tree.insert("", tk.END, values=fila)
+        columnas = ("id", "fecha", "hora", "total", "redondeo", "donacion")
+        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=3, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
+        
+        scrollbar.config(command=self.tree.yview)
+
+        for col, texto in zip(columnas[1:], ["Fecha", "Hora", "Total", "Redondeo", "Donación"]):
+            self.tree.heading(col, text=texto, command=lambda c=col: self._ordenar_columna(self.tree, c, False))
+            self.tree.column(col, width=100, anchor="center")
+
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.tree.bind("<Double-1>", self._on_tree_double_click)
+
+        self._cargar_historial()
 
     # --- Lógica de carrito ---
     def agregar_al_carrito(self, nombre, precio):
@@ -306,6 +342,15 @@ class PuntoVentaView(tk.Frame):
         self.subtotal_label.config(text=f"Subtotal: $ {subtotal:.2f}")
         self.total_label.config(text=f"Total a Pagar: $ {total:.2f}")
 
+        # Calcular cambio
+        try:
+            pago = float(self.pago_var.get())
+        except ValueError:
+            pago = 0.0
+        
+        cambio = pago - total
+        self.cambio_label.config(text=f"Cambio: $ {cambio:.2f}", fg="green" if cambio >= 0 else "red")
+
     def _completar_venta(self):
         from tkinter import messagebox
         id_venta = self.controller.procesar_venta()
@@ -313,8 +358,124 @@ class PuntoVentaView(tk.Frame):
         if id_venta:
             messagebox.showinfo("Venta Exitosa", f"Venta registrada correctamente.\nID: {id_venta}")
             self._render_carrito()
+            self._cargar_historial()
         else:
             if not self.controller.carrito:
                 messagebox.showwarning("Carrito Vacío", "Agregue productos antes de completar la venta.")
             else:
                 messagebox.showerror("Error", "Ocurrió un error al procesar la venta.")
+
+    def _ordenar_columna(self, tree, col, reverse):
+        """Ordenar treeview por columna"""
+        l = [(tree.set(k, col), k) for k in tree.get_children('')]
+        
+        # Intentar convertir a float para ordenamiento numérico (removiendo $)
+        try:
+            # Detectar si es moneda o número
+            sample = l[0][0] if l else ""
+            if "$" in sample:
+                l.sort(key=lambda t: float(t[0].replace('$', '').replace(',', '')), reverse=reverse)
+            else:
+                # Intento genérico de float
+                l.sort(key=lambda t: float(t[0]), reverse=reverse)
+        except ValueError:
+            # Fallback a string sort
+            l.sort(reverse=reverse)
+
+        for index, (val, k) in enumerate(l):
+            tree.move(k, '', index)
+
+        # Invertir orden para la próxima vez
+        tree.heading(col, command=lambda: self._ordenar_columna(tree, col, not reverse))
+
+    def _cargar_historial(self):
+        """Cargar y mostrar historial de ventas"""
+        # Limpiar tabla actual
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        # Cargar datos reales
+        datos = self.controller.obtener_historial_ventas()
+        for fila in datos:
+            self.tree.insert("", tk.END, values=fila)
+
+    def _on_tree_double_click(self, event):
+        """Manejar doble click en historial"""
+        item_id = self.tree.selection()
+        if not item_id:
+            return
+            
+        item = self.tree.item(item_id)
+        valores = item['values']
+        if not valores:
+            return
+            
+        # ID es el primer valor
+        id_venta = valores[0]
+        self._mostrar_detalle_popup(id_venta)
+
+    def _mostrar_detalle_popup(self, id_venta):
+        """Mostrar popup con detalles de la venta"""
+        venta = self.controller.obtener_detalle_venta(id_venta)
+        if not venta:
+            return
+
+        popup = tk.Toplevel(self)
+        popup.title(f"Detalle de Venta #{id_venta}")
+        popup.geometry("500x400")
+        popup.configure(bg=self.app.COLOR_FONDO_EXTERIOR)
+
+        # Header
+        header = tk.Frame(popup, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=10)
+        header.pack(fill=tk.X, padx=10, pady=10)
+
+        tk.Label(header, text=f"Venta #{id_venta}", font=("Arial", 14, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w")
+        tk.Label(header, text=f"Fecha: {venta['fecha']} {venta['hora'][:5]}", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w")
+        
+        # Items
+        items_frame = tk.Frame(popup, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=10)
+        items_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        tk.Label(items_frame, text="Productos", font=("Arial", 11, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(0, 5))
+
+        # Lista de items
+        canvas = tk.Canvas(items_frame, bg=self.app.COLOR_FONDO_INTERIOR, highlightthickness=0)
+        scrollbar = tk.Scrollbar(items_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=self.app.COLOR_FONDO_INTERIOR)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Headers items
+        h_frame = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        h_frame.pack(fill=tk.X, pady=2)
+        tk.Label(h_frame, text="Producto", width=25, anchor="w", font=("Arial", 9, "bold"), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
+        tk.Label(h_frame, text="Cant.", width=8, anchor="center", font=("Arial", 9, "bold"), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
+        tk.Label(h_frame, text="Total", width=10, anchor="e", font=("Arial", 9, "bold"), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
+
+        for item in venta.get('items', []):
+            p_nombre = item['producto']['nombre'] if item.get('producto') else "Producto desconocido"
+            cantidad = item['cantidad_vendida']
+            subtotal = item['subtotal']
+            
+            row = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+            row.pack(fill=tk.X, pady=2)
+            
+            tk.Label(row, text=p_nombre, width=25, anchor="w", font=("Arial", 9), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
+            tk.Label(row, text=f"{cantidad}", width=8, anchor="center", font=("Arial", 9), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
+            tk.Label(row, text=f"${subtotal:.2f}", width=10, anchor="e", font=("Arial", 9), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
+
+        # Totales
+        total_frame = tk.Frame(popup, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=10)
+        total_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        tk.Label(total_frame, text=f"Total: ${venta['monto_total']:.2f}", font=("Arial", 12, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="e")
+
