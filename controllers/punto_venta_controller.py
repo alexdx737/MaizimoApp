@@ -42,7 +42,6 @@ class PuntoVentaController:
             self.productos = [
                 {'id_producto': 1, 'nombre': 'Tortillas (kg)', 'precio': 25.0, 'stock': 100, 'unidad_medida': 'kg'},
                 {'id_producto': 2, 'nombre': 'Tostadas (paquete)', 'precio': 15.0, 'stock': 50, 'unidad_medida': 'pz'},
-                {'id_producto': 3, 'nombre': 'Chips (bolsa)', 'precio': 20.0, 'stock': 30, 'unidad_medida': 'pz'},
                 {'id_producto': 4, 'nombre': 'Tamales', 'precio': 12.0, 'stock': 25, 'unidad_medida': 'pz'},
             ]
 
@@ -91,20 +90,16 @@ class PuntoVentaController:
         subtotal = sum(item["precio"] * item["cantidad"] for item in self.carrito)
 
         descuento = 2.0 if self.bolsa and subtotal >= 2.0 else 0.0
-        subtotal_desc = max(subtotal - descuento, 0.0)
+        total = max(subtotal - descuento, 0.0)
 
-        if self.redondeo and subtotal_desc > 0:
-            total_redondeado = float(int(subtotal_desc + 0.9999))
-        else:
-            total_redondeado = subtotal_desc
+        return subtotal, total
 
-        return subtotal, total_redondeado
-
-    def procesar_venta(self, id_cliente=1):
+    def procesar_venta(self, id_cliente=1, monto_pago=0):
         """
         Procesar y guardar la venta en Supabase
         Args:
             id_cliente: ID del cliente (default: 1 para cliente general)
+            monto_pago: Monto con el que paga el cliente
         Returns: ID de venta_completa o None
         """
         if not self.carrito:
@@ -116,7 +111,8 @@ class PuntoVentaController:
                 carrito=self.carrito,
                 id_cliente=id_cliente,
                 descuento_bolsa=self.bolsa,
-                redondeo=self.redondeo
+                redondeo=self.redondeo,
+                monto_pago=monto_pago
             )
             
             if id_venta:
@@ -131,7 +127,7 @@ class PuntoVentaController:
             print(f"Error en procesar_venta: {e}")
             return None
 
-    # --- Helpers internos ---
+    # --- auxiliares internos ---
     def _obtener_producto(self, nombre):
         """Obtener producto completo por nombre"""
         for producto in self.productos:

@@ -114,17 +114,14 @@ class ProductoModel:
     @staticmethod
     def eliminar(id_producto):
         """Delete a product"""
-        try:
-            supabase = get_supabase_client()
-            response = supabase.table('producto')\
-                .delete()\
-                .eq('id_producto', id_producto)\
-                .execute()
-            
-            return True
-        except Exception as e:
-            print(f"Error eliminando producto: {e}")
-            return False
+        # No try/except here to allow controller to handle specific errors
+        supabase = get_supabase_client()
+        response = supabase.table('producto')\
+            .delete()\
+            .eq('id_producto', id_producto)\
+            .execute()
+        
+        return True
     
     @staticmethod
     def buscar_por_nombre(nombre):

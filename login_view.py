@@ -108,7 +108,13 @@ class LoginView:
         tk.Button(self.frame_login, text="Iniciar Sesión", command=self.Login,
                   bg=self.COLOR_BOTON_FONDO, fg=self.COLOR_BOTON_TEXTO,
                   font=("Arial", 14, "bold"), width=30, height=1, bd=0, relief=tk.FLAT,
-                  activebackground="#D39210", activeforeground=self.COLOR_BOTON_TEXTO).grid(row=7, column=0, columnspan=2, pady=(0, 0))
+                  activebackground="#D39210", activeforeground=self.COLOR_BOTON_TEXTO).grid(row=7, column=0, columnspan=2, pady=(0, 10))
+        
+        # --- Botón de Registrarse ---
+        tk.Button(self.frame_login, text="Registrarse", command=self.abrir_registro,
+                  bg="#666666", fg="white",
+                  font=("Arial", 12, "bold"), width=30, height=1, bd=0, relief=tk.FLAT,
+                  activebackground="#555555", activeforeground="white").grid(row=8, column=0, columnspan=2, pady=(0, 0))
 
     # --- Métodos de Placeholder ---
     def _clear_placeholder(self, event):
@@ -156,6 +162,14 @@ class LoginView:
                 messagebox.showerror("Acceso denegado", "ID o contraseña incorrectos.")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error al conectar: {e}")
+    
+    def abrir_registro(self):
+        """Abrir la ventana de registro"""
+        self.root.destroy()
+        from registro_view import RegistroView
+        root = tk.Tk()
+        app = RegistroView(root)
+        root.mainloop()
 
 if __name__ == "__main__":
     print("Iniciando interfaz gráfica...")

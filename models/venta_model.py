@@ -83,14 +83,15 @@ class VentaModel:
             return None
     
     @staticmethod
-    def procesar_venta(carrito, id_cliente, descuento_bolsa=False, redondeo=False):
+    def procesar_venta(carrito, id_cliente, descuento_bolsa=False, redondeo=False, monto_pago=0):
         """
         Process a complete sale with multiple items
         Args:
             carrito: List of cart items [{id_producto, cantidad, precio, nombre}]
             id_cliente: Client ID
             descuento_bolsa: Apply bag discount
-            redondeo: Apply rounding for donation
+            redondeo: Donate the change
+            monto_pago: Amount paid by customer
         Returns: venta_completa ID or None
         """
         try:
@@ -99,20 +100,18 @@ class VentaModel:
             
             # Apply bag discount
             descuento = 2.0 if descuento_bolsa and subtotal >= 2.0 else 0.0
-            subtotal_desc = max(subtotal - descuento, 0.0)
+            total = max(subtotal - descuento, 0.0)
             
-            # Apply rounding
-            if redondeo and subtotal_desc > 0:
-                total_redondeado = float(int(subtotal_desc + 0.9999))
-                monto_redondeo = total_redondeado - subtotal_desc
+            # Calculate donation from change (if redondeo is enabled and customer paid more than total)
+            if redondeo and monto_pago > total:
+                monto_donacion = monto_pago - total
             else:
-                total_redondeado = subtotal_desc
-                monto_redondeo = 0.0
+                monto_donacion = 0.0
             
             # Create venta_completa
             venta_completa = VentaModel.crear_venta_completa(
                 id_cliente=id_cliente,
-                monto_total=total_redondeado,
+                monto_total=total,
                 descuento_bolsa=descuento_bolsa,
                 descripcion=f"Venta con {len(carrito)} productos"
             )
@@ -133,10 +132,10 @@ class VentaModel:
                     subtotal=item_subtotal
                 )
             
-            # Create donation if rounding was applied
-            if monto_redondeo > 0:
+            # Create donation if customer donated their change
+            if monto_donacion > 0:
                 from models.donacion_model import DonacionModel
-                DonacionModel.crear(id_venta_completa, monto_redondeo)
+                DonacionModel.crear(id_venta_completa, monto_donacion)
             
             return id_venta_completa
             

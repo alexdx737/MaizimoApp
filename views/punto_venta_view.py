@@ -144,7 +144,7 @@ class PuntoVentaView(tk.Frame):
 
         tk.Checkbutton(
             redondeo_frame,
-            text="Redondear para donación de tortillas",
+            text="Donar el cambio para tortillas",
             variable=self.redondeo_var,
             onvalue=True,
             offvalue=False,
@@ -224,13 +224,13 @@ class PuntoVentaView(tk.Frame):
 
         # Container for tree and scrollbar
         tree_container = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
-        tree_container.pack(fill=tk.BOTH, expand=True)
+        tree_container.pack(fill=tk.X, expand=False)
 
         scrollbar = tk.Scrollbar(tree_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         columnas = ("id", "fecha", "hora", "total", "redondeo", "donacion")
-        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=3, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
+        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=4, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
         
         scrollbar.config(command=self.tree.yview)
 
@@ -348,15 +348,28 @@ class PuntoVentaView(tk.Frame):
         except ValueError:
             pago = 0.0
         
-        cambio = pago - total
-        self.cambio_label.config(text=f"Cambio: $ {cambio:.2f}", fg="green" if cambio >= 0 else "red")
+        # Si está marcado "donar el cambio", el cambio es 0
+        if self.redondeo_var.get() and pago >= total:
+            cambio = 0.0
+            self.cambio_label.config(text=f"Cambio: $ {cambio:.2f} (donado)", fg="green")
+        else:
+            cambio = pago - total
+            self.cambio_label.config(text=f"Cambio: $ {cambio:.2f}", fg="green" if cambio >= 0 else "red")
 
     def _completar_venta(self):
         from tkinter import messagebox
-        id_venta = self.controller.procesar_venta()
+        
+        # Obtener monto de pago
+        try:
+            monto_pago = float(self.pago_var.get())
+        except ValueError:
+            monto_pago = 0.0
+        
+        id_venta = self.controller.procesar_venta(monto_pago=monto_pago)
         
         if id_venta:
-            messagebox.showinfo("Venta Exitosa", f"Venta registrada correctamente.\nID: {id_venta}")
+            messagebox.showinfo("Venta Exitosa", f"Venta registrada correctamente.\\nID: {id_venta}")
+            self.pago_var.set("0")  # Reset payment field
             self._render_carrito()
             self._cargar_historial()
         else:
