@@ -73,6 +73,13 @@ class InclusionLaboralView(tk.Frame):
         
         # Bind double click para editar
         self.tree.bind("<Double-1>", self._on_doble_click)
+        
+        # Menu contextual (click derecho)
+        self.menu_contextual = tk.Menu(self, tearoff=0)
+        self.menu_contextual.add_command(label="Editar", command=self._editar_seleccionado)
+        self.menu_contextual.add_command(label="Eliminar", command=self._eliminar_seleccionado)
+        
+        self.tree.bind("<Button-3>", self._mostrar_menu_contextual)
 
         self._cargar_datos()
 
@@ -158,6 +165,49 @@ class InclusionLaboralView(tk.Frame):
             else:
                 messagebox.showerror("Error", "No se pudo actualizar el trabajador")
 
+    def _mostrar_menu_contextual(self, event):
+        """Mostrar menú contextual en la posición del mouse"""
+        item_id = self.tree.identify_row(event.y)
+        if item_id:
+            self.tree.selection_set(item_id)
+            self.menu_contextual.post(event.x_root, event.y_root)
+
+    def _editar_seleccionado(self):
+        """Wrapper para editar desde menú"""
+        item_id = self.tree.selection()
+        if item_id:
+            item = self.tree.item(item_id)
+            valores = item['values']
+            if valores:
+                self._editar_trabajador(valores[0])
+
+    def _eliminar_seleccionado(self):
+        """Eliminar trabajador seleccionado"""
+        item_id = self.tree.selection()
+        if not item_id:
+            return
+            
+        item = self.tree.item(item_id)
+        valores = item['values']
+        if not valores:
+            return
+            
+        id_empleado = valores[0]
+        nombre = valores[1]
+        
+        confirmacion = messagebox.askyesno(
+            "Confirmar Eliminación",
+            f"¿Está seguro que desea eliminar al trabajador '{nombre}'?\\nEsta acción no se puede deshacer."
+        )
+        
+        if confirmacion:
+            exito = self.controller.eliminar_trabajador(id_empleado)
+            if exito:
+                messagebox.showinfo("Éxito", "Trabajador eliminado correctamente")
+                self._cargar_datos()
+            else:
+                messagebox.showerror("Error", "No se pudo eliminar el trabajador")
+
 
 class TrabajadorDialog(tk.Toplevel):
     """Diálogo para agregar/editar trabajador"""
@@ -169,9 +219,9 @@ class TrabajadorDialog(tk.Toplevel):
         self.resultado = None
         
         self.title(titulo)
-        self.geometry("400x500")
+        self.geometry("400x600")
         self.configure(bg=app.COLOR_FONDO_EXTERIOR)
-        self.resizable(False, False)
+        self.resizable(True, True)
         
         # Hacer modal
         self.transient(parent)

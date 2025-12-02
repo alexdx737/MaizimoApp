@@ -27,6 +27,9 @@ class ClientesMayoristasController:
                 self.clientes.append({
                     'id': c['id_cliente'],
                     'nombre': nombre_completo,
+                    'nombre_raw': c['nombre'],
+                    'apellido_paterno': c['apellido_paterno'],
+                    'apellido_materno': c.get('apellido_materno', ''),
                     'telefono': telefono,
                     'descuento_pct': float(c['descuento']),
                     'descuento_str': descuento,

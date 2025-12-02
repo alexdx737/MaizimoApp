@@ -8,6 +8,10 @@ class PuntoVentaView(tk.Frame):
         self.app = app
         self.controller = controller
 
+        # Recargar datos al abrir la vista para asegurar que esté actualizada
+        self.controller.cargar_clientes()
+        self.controller.cargar_productos()
+
         self._construir_ui()
 
     def _construir_ui(self):
