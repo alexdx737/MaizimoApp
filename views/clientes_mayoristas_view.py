@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox, simpledialog
 
 
 class ClientesMayoristasView(tk.Frame):
@@ -33,16 +33,246 @@ class ClientesMayoristasView(tk.Frame):
             relief=tk.FLAT,
             padx=15,
             pady=5,
+            command=self._agregar_cliente
         ).pack(side=tk.RIGHT)
 
-        columnas = ("cliente", "contacto", "descuento", "acciones")
-        tree = ttk.Treeview(marco, columns=columnas, show="headings", height=6)
-        titulos = ["Cliente", "Contacto", "Descuento Aplicado", "Acciones"]
-        for col, texto in zip(columnas, titulos):
-            tree.heading(col, text=texto)
-            tree.column(col, anchor="center", width=180)
+        # Treeview container con scrollbar
+        tree_frame = tk.Frame(marco, bg=self.app.COLOR_FONDO_INTERIOR)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
 
-        tree.pack(fill=tk.BOTH, expand=True)
+        scrollbar = tk.Scrollbar(tree_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        for fila in self.controller.clientes:
-            tree.insert("", tk.END, values=fila)
+        columnas = ("id", "cliente", "contacto", "descuento", "acciones")
+        self.tree = ttk.Treeview(tree_frame, columns=columnas, show="headings", 
+                                 height=10, yscrollcommand=scrollbar.set,
+                                 displaycolumns=("cliente", "contacto", "descuento", "acciones"))
+        
+        scrollbar.config(command=self.tree.yview)
+
+        titulos = ["Cliente", "Contacto", "Descuento", "Acciones"]
+        columnas_display = ("cliente", "contacto", "descuento", "acciones")
+        for col, texto in zip(columnas_display, titulos):
+            self.tree.heading(col, text=texto)
+            self.tree.column(col, anchor="center", width=180)
+
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Bind double click para editar
+        self.tree.bind("<Double-1>", self._on_doble_click)
+
+        self._cargar_datos()
+
+    def _cargar_datos(self):
+        """Cargar datos en el Treeview"""
+        # Limpiar Treeview
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        
+        # Cargar clientes
+        for cliente in self.controller.clientes:
+            self.tree.insert("", tk.END, values=(
+                cliente['id'],
+                cliente['nombre'],
+                cliente['telefono'],
+                cliente['descuento_str'],
+                "✏ 🗑"
+            ))
+    
+    def _on_doble_click(self, event):
+        """Manejar doble click en una fila"""
+        item_id = self.tree.selection()
+        if not item_id:
+            return
+        
+        item = self.tree.item(item_id)
+        valores = item['values']
+        if not valores:
+            return
+        
+        id_cliente = valores[0]
+        self._editar_cliente(id_cliente)
+    
+    def _agregar_cliente(self):
+        """Mostrar diálogo para agregar cliente"""
+        dialog = ClienteDialog(self, self.app, "Agregar Cliente")
+        dialog.wait_window()
+        
+        if dialog.resultado:
+            datos = dialog.resultado
+            exito = self.controller.agregar_cliente(
+                nombre=datos['nombre'],
+                apellido_paterno=datos['apellido_paterno'],
+                telefono=datos['telefono'],
+                apellido_materno=datos.get('apellido_materno'),
+                direccion=datos.get('direccion'),
+                descuento=datos.get('descuento', 0.0),
+                descripcion=datos.get('descripcion')
+            )
+            
+            if exito:
+                messagebox.showinfo("Éxito", "Cliente agregado correctamente")
+                self._cargar_datos()
+            else:
+                messagebox.showerror("Error", "No se pudo agregar el cliente")
+    
+    def _editar_cliente(self, id_cliente):
+        """Mostrar diálogo para editar cliente"""
+        cliente = self.controller.obtener_cliente(id_cliente)
+        if not cliente:
+            return
+        
+        dialog = ClienteDialog(self, self.app, "Editar Cliente", cliente)
+        dialog.wait_window()
+        
+        if dialog.resultado:
+            datos = dialog.resultado
+            exito = self.controller.actualizar_cliente(
+                id_cliente=id_cliente,
+                nombre=datos['nombre'],
+                apellido_paterno=datos['apellido_paterno'],
+                apellido_materno=datos.get('apellido_materno'),
+                telefono=datos['telefono'],
+                direccion=datos.get('direccion'),
+                descuento=datos.get('descuento', 0.0),
+                descripcion=datos.get('descripcion')
+            )
+            
+            if exito:
+                messagebox.showinfo("Éxito", "Cliente actualizado correctamente")
+                self._cargar_datos()
+            else:
+                messagebox.showerror("Error", "No se pudo actualizar el cliente")
+
+
+class ClienteDialog(tk.Toplevel):
+    """Diálogo para agregar/editar cliente"""
+    
+    def __init__(self, parent, app, titulo, cliente=None):
+        super().__init__(parent)
+        self.app = app
+        self.cliente = cliente
+        self.resultado = None
+        
+        self.title(titulo)
+        self.geometry("400x450")
+        self.configure(bg=app.COLOR_FONDO_EXTERIOR)
+        self.resizable(False, False)
+        
+        # Hacer modal
+        self.transient(parent)
+        self.grab_set()
+        
+        self._construir_ui()
+        
+        # Centrar ventana
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+        self.geometry(f"+{x}+{y}")
+    
+    def _construir_ui(self):
+        frame = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20)
+        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Nombre
+        tk.Label(frame, text="Nombre:", font=("Arial", 10), 
+                bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
+        self.nombre_var = tk.StringVar(value=self.cliente['nombre'].split()[0] if self.cliente else "")
+        tk.Entry(frame, textvariable=self.nombre_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        
+        # Apellido Paterno
+        tk.Label(frame, text="Apellido Paterno:", font=("Arial", 10), 
+                bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
+        apellidos = self.cliente['nombre'].split()[1:] if self.cliente else []
+        self.apellido_p_var = tk.StringVar(value=apellidos[0] if apellidos else "")
+        tk.Entry(frame, textvariable=self.apellido_p_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        
+        # Apellido Materno
+        tk.Label(frame, text="Apellido Materno (opcional):", font=("Arial", 10), 
+                bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
+        self.apellido_m_var = tk.StringVar(value=apellidos[1] if len(apellidos) > 1 else "")
+        tk.Entry(frame, textvariable=self.apellido_m_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        
+        # Teléfono
+        tk.Label(frame, text="Teléfono:", font=("Arial", 10), 
+                bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
+        self.telefono_var = tk.StringVar(value=self.cliente['telefono'] if self.cliente else "")
+        tk.Entry(frame, textvariable=self.telefono_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        
+        # Dirección
+        tk.Label(frame, text="Dirección (opcional):", font=("Arial", 10), 
+                bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
+        self.direccion_var = tk.StringVar(value=self.cliente['direccion'] if self.cliente else "")
+        tk.Entry(frame, textvariable=self.direccion_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        
+        # Descuento
+        tk.Label(frame, text="Descuento (%):", font=("Arial", 10), 
+                bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
+        self.descuento_var = tk.StringVar(value=str(self.cliente['descuento_pct']) if self.cliente else "0")
+        tk.Entry(frame, textvariable=self.descuento_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        
+        # Descripción
+        tk.Label(frame, text="Descripción (opcional):", font=("Arial", 10), 
+                bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
+        self.descripcion_var = tk.StringVar(value=self.cliente['descripcion'] if self.cliente else "")
+        tk.Entry(frame, textvariable=self.descripcion_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,10))
+        
+        # Botones
+        botones_frame = tk.Frame(frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        botones_frame.pack(fill=tk.X, pady=(10,0))
+        
+        tk.Button(
+            botones_frame,
+            text="Guardar",
+            font=("Arial", 10, "bold"),
+            bg=self.app.COLOR_BOTON_FONDO,
+            fg=self.app.COLOR_BOTON_TEXTO,
+            relief=tk.FLAT,
+            padx=20,
+            pady=5,
+            command=self._guardar
+        ).pack(side=tk.RIGHT, padx=(5,0))
+        
+        tk.Button(
+            botones_frame,
+            text="Cancelar",
+            font=("Arial", 10),
+            bg="#CCCCCC",
+            fg="#000000",
+            relief=tk.FLAT,
+            padx=20,
+            pady=5,
+            command=self.destroy
+        ).pack(side=tk.RIGHT)
+    
+    def _guardar(self):
+        """Validar y guardar datos"""
+        nombre = self.nombre_var.get().strip()
+        apellido_p = self.apellido_p_var.get().strip()
+        telefono = self.telefono_var.get().strip()
+        
+        if not nombre or not apellido_p or not telefono:
+            messagebox.showerror("Error", "Nombre, Apellido Paterno y Teléfono son obligatorios")
+            return
+        
+        try:
+            descuento = float(self.descuento_var.get())
+            if descuento < 0 or descuento > 100:
+                messagebox.showerror("Error", "El descuento debe estar entre 0 y 100")
+                return
+        except ValueError:
+            messagebox.showerror("Error", "El descuento debe ser un número")
+            return
+        
+        self.resultado = {
+            'nombre': nombre,
+            'apellido_paterno': apellido_p,
+            'apellido_materno': self.apellido_m_var.get().strip() or None,
+            'telefono': telefono,
+            'direccion': self.direccion_var.get().strip() or None,
+            'descuento': descuento,
+            'descripcion': self.descripcion_var.get().strip() or None
+        }
+        
+        self.destroy()

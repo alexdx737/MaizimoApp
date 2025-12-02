@@ -8,13 +8,24 @@ class PuntoVentaController:
     def __init__(self):
         from models.producto_model import ProductoModel
         from models.venta_model import VentaModel
+        from models.cliente_model import ClienteModel
         
         self.ProductoModel = ProductoModel
         self.VentaModel = VentaModel
+        self.ClienteModel = ClienteModel
         
         # Cargar productos desde Supabase
         self.productos = []
+        self.productos_filtrados = []  # Para búsqueda
         self.cargar_productos()
+
+        # Cargar clientes para selección
+        self.clientes = []
+        self.cargar_clientes()
+        
+        # Cliente seleccionado (default: cliente general ID 1)
+        self.id_cliente_seleccionado = 1
+        self.descuento_cliente = 0.0  # Porcentaje de descuento
 
         # Carrito: lista de dicts {id_producto, nombre, precio, cantidad, unidad_medida}
         self.carrito = []
@@ -44,6 +55,59 @@ class PuntoVentaController:
                 {'id_producto': 2, 'nombre': 'Tostadas (paquete)', 'precio': 15.0, 'stock': 50, 'unidad_medida': 'pz'},
                 {'id_producto': 4, 'nombre': 'Tamales', 'precio': 12.0, 'stock': 25, 'unidad_medida': 'pz'},
             ]
+        
+        # Inicializar productos filtrados con todos los productos
+        self.productos_filtrados = self.productos[:]
+    
+    def cargar_clientes(self):
+        """Cargar clientes desde Supabase"""
+        try:
+            clientes_db = self.ClienteModel.listar_todos()
+            self.clientes = [
+                {
+                    'id': c['id_cliente'],
+                    'nombre': f"{c['nombre']} {c['apellido_paterno']}",
+                    'descuento': float(c['descuento'])
+                }
+                for c in clientes_db
+            ]
+            print(f"✓ Cargados {len(self.clientes)} clientes")
+        except Exception as e:
+            print(f"Error cargando clientes: {e}")
+            self.clientes = [{'id': 1, 'nombre': 'Cliente General', 'descuento': 0.0}]
+    
+    def set_cliente(self, id_cliente):
+        """Establecer cliente seleccionado y su descuento"""
+        self.id_cliente_seleccionado = id_cliente
+        
+        # Buscar descuento del cliente
+        for cliente in self.clientes:
+            if cliente['id'] == id_cliente:
+                self.descuento_cliente = cliente['descuento']
+                print(f"✓ Cliente seleccionado: {cliente['nombre']}, Descuento: {self.descuento_cliente}%")
+                return
+        
+        # Si no se encuentra, usar cliente general
+        self.descuento_cliente = 0.0
+    
+    def filtrar_productos(self, termino):
+        """Filtrar productos por nombre o ID"""
+        if not termino or termino.strip() == "":
+            # Si no hay término, mostrar todos
+            self.productos_filtrados = self.productos[:]
+        else:
+            termino = termino.lower().strip()
+            self.productos_filtrados = []
+            
+            for p in self.productos:
+                # Buscar por nombre
+                if termino in p['nombre'].lower():
+                    self.productos_filtrados.append(p)
+                # Buscar por ID (convertir a string)
+                elif termino in str(p['id_producto']):
+                    self.productos_filtrados.append(p)
+        
+        print(f"✓ Filtrados {len(self.productos_filtrados)} productos")
 
     # --- Operaciones sobre el carrito ---
     def agregar_al_carrito(self, nombre):
@@ -89,12 +153,20 @@ class PuntoVentaController:
     def calcular_totales(self):
         subtotal = sum(item["precio"] * item["cantidad"] for item in self.carrito)
 
-        descuento = 2.0 if self.bolsa and subtotal >= 2.0 else 0.0
-        total = max(subtotal - descuento, 0.0)
+        # Descuento por bolsa
+        descuento_bolsa = 2.0 if self.bolsa and subtotal >= 2.0 else 0.0
+        
+        # Descuento de cliente mayorista (porcentaje)
+        descuento_cliente_monto = (subtotal * self.descuento_cliente) / 100.0
+        
+        # Total de descuentos
+        descuento_total = descuento_bolsa + descuento_cliente_monto
+        
+        total = max(subtotal - descuento_total, 0.0)
 
-        return subtotal, total
+        return subtotal, total, descuento_cliente_monto
 
-    def procesar_venta(self, id_cliente=1, monto_pago=0):
+    def procesar_venta(self, monto_pago=0):
         """
         Procesar y guardar la venta en Supabase
         Args:
@@ -109,7 +181,7 @@ class PuntoVentaController:
         try:
             id_venta = self.VentaModel.procesar_venta(
                 carrito=self.carrito,
-                id_cliente=id_cliente,
+                id_cliente=self.id_cliente_seleccionado,
                 descuento_bolsa=self.bolsa,
                 redondeo=self.redondeo,
                 monto_pago=monto_pago

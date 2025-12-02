@@ -64,40 +64,47 @@ class PuntoVentaView(tk.Frame):
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w")
 
-        # Productos provenientes del controller
-        for producto in self.controller.productos:
-            nombre = producto['nombre']
-            precio = producto['precio']
-            
-            item_frame = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
-            item_frame.pack(fill=tk.X, pady=5)
+        # Buscador de productos
+        buscar_frame = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        buscar_frame.pack(fill=tk.X, pady=(5, 10))
 
-            tk.Label(
-                item_frame,
-                text=nombre,
-                font=("Arial", 11),
-                fg=self.app.COLOR_TEXTO_PRIMARIO,
-                bg=self.app.COLOR_FONDO_INTERIOR,
-            ).pack(side=tk.LEFT, anchor="w")
+        tk.Label(
+            buscar_frame,
+            text="🔍",
+            font=("Arial", 12),
+            bg=self.app.COLOR_FONDO_INTERIOR,
+            fg=self.app.COLOR_TEXTO_PRIMARIO,
+        ).pack(side=tk.LEFT)
 
-            tk.Label(
-                item_frame,
-                text=f"$ {precio:.2f}",
-                font=("Arial", 10),
-                fg=self.app.COLOR_TEXTO_PRIMARIO,
-                bg=self.app.COLOR_FONDO_INTERIOR,
-            ).pack(side=tk.LEFT, padx=10)
+        self.buscar_var = tk.StringVar()
+        self.buscar_var.trace('w', lambda *args: self._filtrar_productos())
+        tk.Entry(
+            buscar_frame,
+            textvariable=self.buscar_var,
+            font=("Arial", 10),
+            width=20
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
-            tk.Button(
-                item_frame,
-                text="+",
-                font=("Arial", 12, "bold"),
-                bg=self.app.COLOR_BOTON_FONDO,
-                fg=self.app.COLOR_BOTON_TEXTO,
-                width=3,
-                relief=tk.FLAT,
-                command=lambda n=nombre, p=precio: self.agregar_al_carrito(n, p),
-            ).pack(side=tk.RIGHT)
+        # Canvas y scrollbar para lista de productos
+        canvas_frame = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.productos_canvas = tk.Canvas(canvas_frame, bg=self.app.COLOR_FONDO_INTERIOR, highlightthickness=0)
+        scrollbar_productos = tk.Scrollbar(canvas_frame, orient="vertical", command=self.productos_canvas.yview)
+        self.productos_lista_frame = tk.Frame(self.productos_canvas, bg=self.app.COLOR_FONDO_INTERIOR)
+
+        self.productos_lista_frame.bind(
+            "<Configure>",
+            lambda e: self.productos_canvas.configure(scrollregion=self.productos_canvas.bbox("all"))
+        )
+
+        self.productos_canvas.create_window((0, 0), window=self.productos_lista_frame, anchor="nw")
+        self.productos_canvas.configure(yscrollcommand=scrollbar_productos.set)
+
+        self.productos_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar_productos.pack(side="right", fill="y")
+
+        self._render_productos()
 
         carrito_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=15)
         carrito_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
@@ -110,6 +117,35 @@ class PuntoVentaView(tk.Frame):
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w")
 
+        # Selección de cliente mayorista
+        cliente_frame = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        cliente_frame.pack(fill=tk.X, pady=(5, 10))
+
+        tk.Label(
+            cliente_frame,
+            text="Cliente:",
+            font=("Arial", 10),
+            fg=self.app.COLOR_TEXTO_PRIMARIO,
+            bg=self.app.COLOR_FONDO_INTERIOR,
+        ).pack(side=tk.LEFT, padx=(0, 5))
+
+        # Crear lista de opciones para combobox
+        cliente_opciones = [f"{c['nombre']} ({c['descuento']:.0f}%)" for c in self.controller.clientes]
+        self.cliente_combo_var = tk.StringVar()
+        if cliente_opciones:
+            self.cliente_combo_var.set(cliente_opciones[0])
+        
+        cliente_combo = ttk.Combobox(
+            cliente_frame,
+            textvariable=self.cliente_combo_var,
+            values=cliente_opciones,
+            state="readonly",
+            font=("Arial", 9),
+            width=25
+        )
+        cliente_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        cliente_combo.bind("<<ComboboxSelected>>", self._on_cliente_seleccionado)
+
         self.carrito_items_frame = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
         self.carrito_items_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 5))
 
@@ -121,6 +157,16 @@ class PuntoVentaView(tk.Frame):
             bg=self.app.COLOR_FONDO_INTERIOR,
         )
         self.subtotal_label.pack(anchor="e", pady=(5, 0))
+
+        # Label para mostrar descuento de cliente
+        self.descuento_cliente_label = tk.Label(
+            carrito_frame,
+            text="Descuento Cliente: $0.00",
+            font=("Arial", 10),
+            fg="green",
+            bg=self.app.COLOR_FONDO_INTERIOR,
+        )
+        self.descuento_cliente_label.pack(anchor="e", pady=(2, 0))
 
         self.bolsa_var = tk.BooleanVar(value=self.controller.bolsa)
         bolsa_frame = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
@@ -230,7 +276,7 @@ class PuntoVentaView(tk.Frame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         columnas = ("id", "fecha", "hora", "total", "redondeo", "donacion")
-        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=4, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
+        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=12, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
         
         scrollbar.config(command=self.tree.yview)
 
@@ -242,6 +288,66 @@ class PuntoVentaView(tk.Frame):
         self.tree.bind("<Double-1>", self._on_tree_double_click)
 
         self._cargar_historial()
+
+    # --- Métodos de productos ---
+    def _render_productos(self):
+        """Renderizar lista de productos filtrados"""
+        # Limpiar productos actuales
+        for w in self.productos_lista_frame.winfo_children():
+            w.destroy()
+        
+        # Mostrar productos filtrados
+        for producto in self.controller.productos_filtrados:
+            nombre = producto['nombre']
+            precio = producto['precio']
+            
+            item_frame = tk.Frame(self.productos_lista_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+            item_frame.pack(fill=tk.X, pady=3)
+
+            tk.Label(
+                item_frame,
+                text=nombre,
+                font=("Arial", 10),
+                fg=self.app.COLOR_TEXTO_PRIMARIO,
+                bg=self.app.COLOR_FONDO_INTERIOR,
+            ).pack(side=tk.LEFT, anchor="w")
+
+            tk.Label(
+                item_frame,
+                text=f"$ {precio:.2f}",
+                font=("Arial", 9),
+                fg=self.app.COLOR_TEXTO_PRIMARIO,
+                bg=self.app.COLOR_FONDO_INTERIOR,
+            ).pack(side=tk.LEFT, padx=5)
+
+            tk.Button(
+                item_frame,
+                text="+",
+                font=("Arial", 10, "bold"),
+                bg=self.app.COLOR_BOTON_FONDO,
+                fg=self.app.COLOR_BOTON_TEXTO,
+                width=3,
+                relief=tk.FLAT,
+                command=lambda n=nombre, p=precio: self.agregar_al_carrito(n, p),
+            ).pack(side=tk.RIGHT)
+    
+    def _filtrar_productos(self):
+        """Filtrar productos según búsqueda"""
+        termino = self.buscar_var.get()
+        self.controller.filtrar_productos(termino)
+        self._render_productos()
+    
+    def _on_cliente_seleccionado(self, event=None):
+        """Manejar selección de cliente"""
+        # Obtener índice seleccionado
+        seleccion = self.cliente_combo_var.get()
+        
+        # Buscar cliente correspondiente
+        for i, c in enumerate(self.controller.clientes):
+            if f"{c['nombre']} ({c['descuento']:.0f}%)" == seleccion:
+                self.controller.set_cliente(c['id'])
+                self._recalcular_totales()
+                break
 
     # --- Lógica de carrito ---
     def agregar_al_carrito(self, nombre, precio):
@@ -337,9 +443,16 @@ class PuntoVentaView(tk.Frame):
         self.controller.set_bolsa(self.bolsa_var.get())
         self.controller.set_redondeo(self.redondeo_var.get())
 
-        subtotal, total = self.controller.calcular_totales()
+        subtotal, total, descuento_cliente_monto = self.controller.calcular_totales()
 
         self.subtotal_label.config(text=f"Subtotal: $ {subtotal:.2f}")
+        
+        # Mostrar descuento de cliente si aplica
+        if descuento_cliente_monto > 0:
+            self.descuento_cliente_label.config(text=f"Descuento Cliente: -$ {descuento_cliente_monto:.2f}")
+        else:
+            self.descuento_cliente_label.config(text="Descuento Cliente: $0.00")
+        
         self.total_label.config(text=f"Total a Pagar: $ {total:.2f}")
 
         # Calcular cambio

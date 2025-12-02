@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 
 
 class ResponsabilidadSocialView(tk.Frame):
@@ -63,7 +64,7 @@ class ResponsabilidadSocialView(tk.Frame):
         info_frame = tk.Frame(redondeo_frame, bg=self.app.COLOR_FONDO_INTERIOR)
         info_frame.pack(fill=tk.X, pady=(0, 10))
 
-        tk.Label(
+        self.fondo_label = tk.Label(
             info_frame,
             text=f"Fondo Acumulado\n${self.controller.fondo_acumulado:.2f}",
             font=("Arial", 11),
@@ -71,9 +72,10 @@ class ResponsabilidadSocialView(tk.Frame):
             bg="#F4C97A",
             padx=15,
             pady=10,
-        ).pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        )
+        self.fondo_label.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
 
-        tk.Label(
+        self.tortillas_label = tk.Label(
             info_frame,
             text=f"Equivalente en Tortillas\n{self.controller.equivalente_tortillas_kg} kg",
             font=("Arial", 11),
@@ -81,34 +83,70 @@ class ResponsabilidadSocialView(tk.Frame):
             bg="#D2E5A1",
             padx=15,
             pady=10,
-        ).pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
+        )
+        self.tortillas_label.pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
 
-        sim_frame = tk.Frame(redondeo_frame, bg=self.app.COLOR_FONDO_INTERIOR)
-        sim_frame.pack(fill=tk.BOTH, expand=True)
+        # Lista de donaciones
+        donaciones_frame = tk.Frame(redondeo_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        donaciones_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
 
         tk.Label(
-            sim_frame,
-            text="Simular Redondeo de Venta",
+            donaciones_frame,
+            text="Historial de Donaciones",
             font=("Arial", 11, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w", pady=(10, 5))
 
-        tk.Label(
-            sim_frame,
-            text="Ejemplo: Con el fondo actual se pueden donar 33 kg de tortillas (132 tortillas aproximadamente)",
-            font=("Arial", 10),
-            fg=self.app.COLOR_TEXTO_PRIMARIO,
-            bg=self.app.COLOR_FONDO_INTERIOR,
-        ).pack(anchor="w", pady=(5, 10))
+        # Treeview container
+        tree_container = tk.Frame(donaciones_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        tree_container.pack(fill=tk.BOTH, expand=True)
 
-        tk.Button(
-            sim_frame,
-            text="Aplicar Redondeo",
-            font=("Arial", 10, "bold"),
-            bg=self.app.COLOR_BOTON_FONDO,
-            fg=self.app.COLOR_BOTON_TEXTO,
-            relief=tk.FLAT,
-            padx=15,
-            pady=6,
-        ).pack(anchor="e")
+        scrollbar = tk.Scrollbar(tree_container)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        columnas = ("id_venta", "fecha", "hora", "monto")
+        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", 
+                                 height=8, yscrollcommand=scrollbar.set)
+        
+        scrollbar.config(command=self.tree.yview)
+
+        titulos = ["ID Venta", "Fecha", "Hora", "Monto Donado"]
+        for col, texto in zip(columnas, titulos):
+            self.tree.heading(col, text=texto)
+            if col == "monto":
+                self.tree.column(col, anchor="center", width=120)
+            elif col == "id_venta":
+                self.tree.column(col, anchor="center", width=80)
+            else:
+                self.tree.column(col, anchor="center", width=100)
+
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self._cargar_donaciones()
+    
+    def _cargar_donaciones(self):
+        """Cargar donaciones en el Treeview"""
+        # Limpiar Treeview
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        
+        # Cargar donaciones
+        for donacion in self.controller.donaciones:
+            self.tree.insert("", tk.END, values=(
+                donacion['id_venta'],
+                donacion['fecha'],
+                donacion['hora'],
+                f"${donacion['monto']:.2f}"
+            ))
+    
+    def actualizar_valores(self):
+        """Actualizar valores mostrados en la interfaz"""
+        self.controller.actualizar_datos()
+        
+        # Actualizar labels
+        self.fondo_label.config(text=f"Fondo Acumulado\n${self.controller.fondo_acumulado:.2f}")
+        self.tortillas_label.config(text=f"Equivalente en Tortillas\n{self.controller.equivalente_tortillas_kg} kg")
+        
+        # Recargar donaciones
+        self._cargar_donaciones()
