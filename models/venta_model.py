@@ -1,7 +1,7 @@
 """
 Venta Model - Sales management
 """
-from database import get_supabase_client
+from core.database import get_supabase_client
 from datetime import datetime, date, time
 from models.producto_model import ProductoModel
 

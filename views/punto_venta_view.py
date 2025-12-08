@@ -426,7 +426,7 @@ class PuntoVentaView(tk.Frame):
             return
         
         try:
-            from database import get_supabase_client
+            from core.database import get_supabase_client
             supabase = get_supabase_client()
             
             # Eliminar todas las donaciones
@@ -460,7 +460,7 @@ class PuntoVentaView(tk.Frame):
             return
         
         try:
-            from database import get_supabase_client
+            from core.database import get_supabase_client
             supabase = get_supabase_client()
             
             # Eliminar todas las ventas (esto también eliminará items y donaciones por cascade)

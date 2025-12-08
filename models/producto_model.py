@@ -1,7 +1,7 @@
 """
 Producto Model - Product management and inventory
 """
-from database import get_supabase_client
+from core.database import get_supabase_client
 
 class ProductoModel:
     """Model for producto table operations"""

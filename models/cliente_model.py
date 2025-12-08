@@ -1,7 +1,7 @@
 """
 Cliente Model - Customer management
 """
-from database import get_supabase_client
+from core.database import get_supabase_client
 
 class ClienteModel:
     """Model for cliente table operations"""

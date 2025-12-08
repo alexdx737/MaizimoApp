@@ -1,7 +1,7 @@
 """
 Donacion Model - Donation management
 """
-from database import get_supabase_client
+from core.database import get_supabase_client
 
 class DonacionModel:
     """Model for donacion table operations"""

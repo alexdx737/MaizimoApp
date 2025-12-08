@@ -3,7 +3,7 @@ Database connection module for Maizimo App
 Uses Supabase (PostgreSQL) for data persistence
 """
 from supabase import create_client, Client
-from config import Config
+from .config import Config
 import psycopg2
 from psycopg2 import pool, Error
 

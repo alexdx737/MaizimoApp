@@ -1,7 +1,7 @@
 """
 Empleado Model - Employee management
 """
-from database import get_supabase_client
+from core.database import get_supabase_client
 
 class EmpleadoModel:
     """Model for empleado table operations"""

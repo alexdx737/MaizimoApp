@@ -1,7 +1,7 @@
 """
 Usuario Model - Authentication and user management
 """
-from database import get_supabase_client
+from core.database import get_supabase_client
 import bcrypt
 
 class UsuarioModel:
