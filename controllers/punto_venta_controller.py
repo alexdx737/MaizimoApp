@@ -177,6 +177,18 @@ class PuntoVentaController:
         if not self.carrito:
             print("Carrito vacío, no se puede procesar venta")
             return None
+
+        # 1. Verificar stock antes de intentar la venta
+        for item in self.carrito:
+            producto_b = self._obtener_producto_por_id(item['id_producto'])
+            if not producto_b:
+                print(f"Producto {item['nombre']} no encontrado en lista local")
+                continue
+            
+            if item['cantidad'] > producto_b['stock']:
+                # Esto debería manejarse con una excepción o retorno especial para UI
+                print(f"Stock insuficiente para {item['nombre']}")
+                raise ValueError(f"Stock insuficiente para {item['nombre']}. Disponible: {producto_b['stock']}")
         
         try:
             id_venta = self.VentaModel.procesar_venta(
@@ -190,6 +202,8 @@ class PuntoVentaController:
             if id_venta:
                 print(f"✓ Venta procesada exitosamente: ID {id_venta}")
                 self.limpiar_carrito()
+                # Recargar productos para actualizar stock local
+                self.cargar_productos()
                 return id_venta
             else:
                 print("✗ Error procesando venta")
@@ -204,6 +218,12 @@ class PuntoVentaController:
         """Obtener producto completo por nombre"""
         for producto in self.productos:
             if producto['nombre'] == nombre:
+                return producto
+        return None
+
+    def _obtener_producto_por_id(self, id_producto):
+        for producto in self.productos:
+            if producto['id_producto'] == id_producto:
                 return producto
         return None
     

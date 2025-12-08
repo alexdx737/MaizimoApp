@@ -9,7 +9,7 @@ import os
 COLOR_TEXTO_PRIMARIO = "#333333"
 COLOR_BOTON_FONDO = "#FDB813"
 COLOR_BOTON_TEXTO = "white"
-COLOR_FONDO_EXTERIOR = "#f0f0f0"
+COLOR_FONDO_EXTERIOR = "#FFF8E1"  # Creamy yellow
 COLOR_FONDO_INTERIOR = "#ffffff"
 
 def validar_credenciales(usuario, password):
@@ -17,10 +17,10 @@ def validar_credenciales(usuario, password):
     user = UsuarioModel.validar_credenciales(usuario, password)
     return user is not None
 
-def run_main_app():
+def run_main_app(usuario_data=None):
     """Iniciar la aplicación principal"""
     root = tk.Tk()
-    app = MainApp(root)
+    app = MainApp(root, usuario_data=usuario_data)
     root.mainloop()
 
 class LoginView:
@@ -47,18 +47,18 @@ class LoginView:
         self.root.configure(bg=self.COLOR_FONDO_EXTERIOR)
         
         # Centrar el Frame principal en la ventana
-        self.frame_login = tk.Frame(root, bg=self.COLOR_FONDO_INTERIOR, padx=30, pady=30, bd=0, relief=tk.FLAT)
+        self.frame_login = tk.Frame(root, bg=self.COLOR_FONDO_INTERIOR, padx=40, pady=40, bd=1, relief=tk.FLAT, highlightbackground="#D0D0D0", highlightthickness=1)
         self.frame_login.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
         self.crear_widgets()
 
     def cargar_imagen(self):
-        # Asegúrate de que esta ruta sea correcta para tu imagen de perfil
-        ruta_imagen = "image_60a746_profile.png" 
+        # Usar el logo de Maizimo
+        ruta_imagen = "maizimo_logo.png" 
         
         try:
             if os.path.exists(ruta_imagen):
-                img = Image.open(ruta_imagen).resize((150, 150), Image.LANCZOS)
+                img = Image.open(ruta_imagen).resize((200, 200), Image.LANCZOS)
                 self.perfil_img = ImageTk.PhotoImage(img)
                 img_label = tk.Label(self.frame_login, image=self.perfil_img, bg=self.COLOR_FONDO_INTERIOR)
                 img_label.grid(row=0, column=0, columnspan=2, pady=(10, 20)) 
@@ -154,10 +154,11 @@ class LoginView:
             return
         
         try:
-            if validar_credenciales(usuario, password):
+            user = UsuarioModel.validar_credenciales(usuario, password)
+            if user:
                 messagebox.showinfo("Acceso concedido", f"Bienvenido!")
                 self.root.destroy()
-                run_main_app()
+                run_main_app(usuario_data=user)
             else:
                 messagebox.showerror("Acceso denegado", "ID o contraseña incorrectos.")
         except Exception as e:

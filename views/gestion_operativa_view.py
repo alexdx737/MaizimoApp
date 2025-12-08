@@ -9,7 +9,7 @@ class GestionOperativaView(tk.Frame):
         self._construir_ui()
 
     def _construir_ui(self):
-        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20)
+        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=25, pady=25, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
         marco.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
 
         tk.Label(
@@ -25,6 +25,18 @@ class GestionOperativaView(tk.Frame):
 
         tk.Button(
             boton_frame,
+            text="🔄 Refrescar",
+            font=("Arial", 10, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            relief=tk.FLAT,
+            padx=15,
+            pady=5,
+            command=self.refrescar_datos
+        ).pack(side=tk.RIGHT, padx=(5, 0))
+
+        tk.Button(
+            boton_frame,
             text="+  Agregar Producto",
             font=("Arial", 10, "bold"),
             bg=self.app.COLOR_BOTON_FONDO,
@@ -35,7 +47,7 @@ class GestionOperativaView(tk.Frame):
             command=self.abrir_dialogo_agregar # Conectar comando
         ).pack(side=tk.RIGHT)
 
-        columnas = ("producto", "cantidad", "unidad", "precio", "valor", "acciones")
+        columnas = ("producto", "cantidad", "unidad", "precio", "valor")
         self.tree = ttk.Treeview(marco, columns=columnas, show="headings", height=6) # Guardar referencia a self.tree
         titulos = [
             "Producto",
@@ -43,7 +55,6 @@ class GestionOperativaView(tk.Frame):
             "Unidad",
             "Precio Unitario",
             "Valor Total",
-            "Acciones",
         ]
         for col, texto in zip(columnas, titulos):
             self.tree.heading(col, text=texto)
@@ -69,6 +80,11 @@ class GestionOperativaView(tk.Frame):
         
         for fila in self.controller.inventario:
             self.tree.insert("", tk.END, values=fila)
+
+    def refrescar_datos(self):
+        """Recarga los datos del controlador y actualiza la tabla"""
+        self.controller.refrescar_inventario()
+        self.refrescar_tabla()
 
     def on_double_click(self, event):
         """Maneja el doble clic en una fila"""
@@ -128,6 +144,9 @@ class ProductDialog(tk.Toplevel):
             self._llenar_datos()
 
     def _construir_form(self):
+        # Registrar validación
+        vcmd_decimal = (self.register(self._validar_decimal), '%P')
+
         frame = tk.Frame(self, bg="#ffffff", padx=20, pady=20)
         frame.pack(fill=tk.BOTH, expand=True)
         
@@ -138,7 +157,7 @@ class ProductDialog(tk.Toplevel):
         
         # Stock
         tk.Label(frame, text="Stock Inicial:", bg="#ffffff", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5,0))
-        self.stock_entry = tk.Entry(frame, width=40)
+        self.stock_entry = tk.Entry(frame, width=40, validate="key", validatecommand=vcmd_decimal)
         self.stock_entry.pack(fill=tk.X, pady=(0,10))
         
         # Unidad
@@ -149,7 +168,7 @@ class ProductDialog(tk.Toplevel):
         
         # Costo
         tk.Label(frame, text="Costo Unitario ($):", bg="#ffffff", font=("Arial", 10, "bold")).pack(anchor="w", pady=(5,0))
-        self.costo_entry = tk.Entry(frame, width=40)
+        self.costo_entry = tk.Entry(frame, width=40, validate="key", validatecommand=vcmd_decimal)
         self.costo_entry.pack(fill=tk.X, pady=(0,10))
         
         # Descripción
@@ -166,6 +185,14 @@ class ProductDialog(tk.Toplevel):
         
         tk.Button(btn_frame, text="Cancelar", command=self.destroy, 
                  bg="#cccccc", fg="black", font=("Arial", 10), relief=tk.FLAT, padx=20).pack(side=tk.RIGHT, padx=5)
+
+    def _validar_decimal(self, new_value):
+        if new_value == "": return True
+        try:
+            float(new_value)
+            return True
+        except ValueError:
+            return False
 
     def _llenar_datos(self):
         self.nombre_entry.insert(0, self.producto['nombre'])

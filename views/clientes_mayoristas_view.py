@@ -10,7 +10,7 @@ class ClientesMayoristasView(tk.Frame):
         self._construir_ui()
 
     def _construir_ui(self):
-        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20)
+        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=25, pady=25, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
         marco.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
 
         tk.Label(
@@ -43,15 +43,15 @@ class ClientesMayoristasView(tk.Frame):
         scrollbar = tk.Scrollbar(tree_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        columnas = ("id", "cliente", "contacto", "descuento", "acciones")
+        columnas = ("id", "cliente", "contacto", "descuento")
         self.tree = ttk.Treeview(tree_frame, columns=columnas, show="headings", 
                                  height=10, yscrollcommand=scrollbar.set,
-                                 displaycolumns=("cliente", "contacto", "descuento", "acciones"))
+                                 displaycolumns=("cliente", "contacto", "descuento"))
         
         scrollbar.config(command=self.tree.yview)
 
-        titulos = ["Cliente", "Contacto", "Descuento", "Acciones"]
-        columnas_display = ("cliente", "contacto", "descuento", "acciones")
+        titulos = ["Cliente", "Contacto", "Descuento"]
+        columnas_display = ("cliente", "contacto", "descuento")
         for col, texto in zip(columnas_display, titulos):
             self.tree.heading(col, text=texto)
             self.tree.column(col, anchor="center", width=180)
@@ -82,8 +82,7 @@ class ClientesMayoristasView(tk.Frame):
                 cliente['id'],
                 cliente['nombre'],
                 cliente['telefono'],
-                cliente['descuento_str'],
-                "✏ 🗑"
+                cliente['descuento_str']
             ))
     
     def _on_doble_click(self, event):
@@ -222,6 +221,10 @@ class ClienteDialog(tk.Toplevel):
         self.geometry(f"+{x}+{y}")
     
     def _construir_ui(self):
+        # Registrar validaciones
+        vcmd_entero = (self.register(self._validar_entero), '%P')
+        vcmd_decimal = (self.register(self._validar_decimal), '%P')
+
         frame = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20)
         frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
@@ -247,7 +250,13 @@ class ClienteDialog(tk.Toplevel):
         tk.Label(frame, text="Teléfono:", font=("Arial", 10), 
                 bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
         self.telefono_var = tk.StringVar(value=self.cliente['telefono'] if self.cliente else "")
-        tk.Entry(frame, textvariable=self.telefono_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        tk.Entry(
+            frame, 
+            textvariable=self.telefono_var, 
+            font=("Arial", 10),
+            validate="key",
+            validatecommand=vcmd_entero
+        ).pack(fill=tk.X, pady=(0,5))
         
         # Dirección
         tk.Label(frame, text="Dirección (opcional):", font=("Arial", 10), 
@@ -259,7 +268,13 @@ class ClienteDialog(tk.Toplevel):
         tk.Label(frame, text="Descuento (%):", font=("Arial", 10), 
                 bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w", pady=(5,0))
         self.descuento_var = tk.StringVar(value=str(self.cliente['descuento_pct']) if self.cliente else "0")
-        tk.Entry(frame, textvariable=self.descuento_var, font=("Arial", 10)).pack(fill=tk.X, pady=(0,5))
+        tk.Entry(
+            frame, 
+            textvariable=self.descuento_var, 
+            font=("Arial", 10),
+            validate="key",
+            validatecommand=vcmd_decimal
+        ).pack(fill=tk.X, pady=(0,5))
         
         # Descripción
         tk.Label(frame, text="Descripción (opcional):", font=("Arial", 10), 
@@ -294,6 +309,18 @@ class ClienteDialog(tk.Toplevel):
             pady=5,
             command=self.destroy
         ).pack(side=tk.RIGHT)
+    
+    def _validar_entero(self, new_value):
+        if new_value == "": return True
+        return new_value.isdigit()
+
+    def _validar_decimal(self, new_value):
+        if new_value == "": return True
+        try:
+            float(new_value)
+            return True
+        except ValueError:
+            return False
     
     def _guardar(self):
         """Validar y guardar datos"""

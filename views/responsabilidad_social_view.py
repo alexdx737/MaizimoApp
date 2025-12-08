@@ -10,7 +10,7 @@ class ResponsabilidadSocialView(tk.Frame):
         self._construir_ui()
 
     def _construir_ui(self):
-        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20)
+        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=25, pady=25, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
         marco.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
 
         descuento_frame = tk.Frame(marco, bg=self.app.COLOR_FONDO_INTERIOR)
@@ -85,6 +85,22 @@ class ResponsabilidadSocialView(tk.Frame):
             pady=10,
         )
         self.tortillas_label.pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
+        
+        # Botón para refrescar datos
+        btn_frame = tk.Frame(redondeo_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        btn_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        tk.Button(
+            btn_frame,
+            text="🔄 Actualizar Datos",
+            font=("Arial", 10, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            relief=tk.FLAT,
+            padx=15,
+            pady=5,
+            command=self.actualizar_valores
+        ).pack(side=tk.LEFT)
 
         # Lista de donaciones
         donaciones_frame = tk.Frame(redondeo_frame, bg=self.app.COLOR_FONDO_INTERIOR)

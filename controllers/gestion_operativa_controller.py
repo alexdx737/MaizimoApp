@@ -30,14 +30,13 @@ class GestionOperativaController:
                 costo_unitario = float(producto['costo_unitario'])
                 valor_total = stock * costo_unitario
                 
-                # Formato: (nombre, stock, unidad, precio_unitario, valor_total, acciones)
+                # Formato: (nombre, stock, unidad, precio_unitario, valor_total)
                 fila = (
                     nombre,
                     f"{stock:.2f}",
                     unidad,
                     f"${costo_unitario:.2f}",
-                    f"${valor_total:.2f}",
-                    "✏ / 🗑" # Indicador visual de acciones
+                    f"${valor_total:.2f}"
                 )
                 self.inventario.append(fila)
         except Exception as e:

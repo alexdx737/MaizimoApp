@@ -11,7 +11,7 @@ class InclusionLaboralView(tk.Frame):
         self._construir_ui()
 
     def _construir_ui(self):
-        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20)
+        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=25, pady=25, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
         marco.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
 
         resumen_frame = tk.Frame(marco, bg=self.app.COLOR_FONDO_INTERIOR)
@@ -50,10 +50,10 @@ class InclusionLaboralView(tk.Frame):
         scrollbar = tk.Scrollbar(tree_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        columnas = ("id", "nombre", "situacion", "ciclo", "fecha", "acciones")
+        columnas = ("id", "nombre", "situacion", "ciclo", "fecha")
         self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", 
                                  height=10, yscrollcommand=scrollbar.set,
-                                 displaycolumns=("nombre", "situacion", "ciclo", "fecha", "acciones"))
+                                 displaycolumns=("nombre", "situacion", "ciclo", "fecha"))
         
         scrollbar.config(command=self.tree.yview)
         
@@ -62,9 +62,8 @@ class InclusionLaboralView(tk.Frame):
             "Situación de Vulnerabilidad",
             "Ciclo de Trabajo",
             "Fecha de Inicio",
-            "Acciones",
         ]
-        columnas_display = ("nombre", "situacion", "ciclo", "fecha", "acciones")
+        columnas_display = ("nombre", "situacion", "ciclo", "fecha")
         for col, texto in zip(columnas_display, titulos):
             self.tree.heading(col, text=texto)
             self.tree.column(col, anchor="center", width=170)
@@ -96,8 +95,7 @@ class InclusionLaboralView(tk.Frame):
                 trabajador['nombre'],
                 trabajador['situacion'],
                 trabajador['ciclo'],
-                trabajador['fecha'],
-                "✏ 🗑"
+                trabajador['fecha']
             ))
     
     def _on_doble_click(self, event):

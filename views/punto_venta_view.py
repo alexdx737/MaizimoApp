@@ -15,11 +15,35 @@ class PuntoVentaView(tk.Frame):
         self._construir_ui()
 
     def _construir_ui(self):
-        top_info = tk.Frame(self, bg=self.app.COLOR_FONDO_EXTERIOR)
+        # Registrar validación para entradas numéricas
+        self.vcmd_decimal = (self.register(self._validar_numero_decimal), '%P')
+        
+        # Create canvas and scrollbar for scrolling
+        canvas = tk.Canvas(self, bg=self.app.COLOR_FONDO_EXTERIOR, highlightthickness=0)
+        scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=self.app.COLOR_FONDO_EXTERIOR)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Enable mousewheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        top_info = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
         top_info.pack(fill=tk.X)
 
-        fondo_frame = tk.Frame(top_info, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=10)
-        fondo_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10), pady=5)
+        fondo_frame = tk.Frame(top_info, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=15, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
+        fondo_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15), pady=8)
 
         tk.Label(
             fondo_frame,
@@ -28,16 +52,18 @@ class PuntoVentaView(tk.Frame):
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w")
+        
+        self.fondo_var = tk.StringVar(value="$0.00 MXN")
         tk.Label(
             fondo_frame,
-            text="$1.25 MXN",
+            textvariable=self.fondo_var,
             font=("Arial", 12),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w", pady=(5, 0))
 
-        eq_frame = tk.Frame(top_info, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=10)
-        eq_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0), pady=5)
+        eq_frame = tk.Frame(top_info, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=15, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
+        eq_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(15, 0), pady=8)
 
         tk.Label(
             eq_frame,
@@ -46,19 +72,37 @@ class PuntoVentaView(tk.Frame):
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w")
+        
+        self.equivalente_var = tk.StringVar(value="0 kg")
         tk.Label(
             eq_frame,
-            text="0 kg",
+            textvariable=self.equivalente_var,
             font=("Arial", 12),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w", pady=(5, 0))
+        
+        # Cargar datos de donaciones
+        self._actualizar_fondo_donaciones()
+        
+        # Botón para reiniciar el fondo
+        tk.Button(
+            fondo_frame,
+            text="🔄 Reiniciar Fondo",
+            font=("Arial", 9, "bold"),
+            bg="#FF5722",
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=3,
+            command=self._reiniciar_fondo_donaciones
+        ).pack(anchor="w", pady=(10, 0))
 
-        mid_frame = tk.Frame(self, bg=self.app.COLOR_FONDO_EXTERIOR)
+        mid_frame = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
         mid_frame.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        productos_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=15)
-        productos_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        productos_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
+        productos_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
 
         tk.Label(
             productos_frame,
@@ -110,8 +154,8 @@ class PuntoVentaView(tk.Frame):
 
         self._render_productos()
 
-        carrito_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=15)
-        carrito_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+        carrito_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
+        carrito_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=15)
 
         tk.Label(
             carrito_frame,
@@ -230,7 +274,9 @@ class PuntoVentaView(tk.Frame):
             pago_frame,
             textvariable=self.pago_var,
             font=("Arial", 10),
-            width=10
+            width=10,
+            validate="key",
+            validatecommand=self.vcmd_decimal
         )
         self.pago_entry.pack(side=tk.LEFT, padx=5)
         self.pago_entry.bind("<KeyRelease>", lambda e: self._recalcular_totales())
@@ -258,23 +304,37 @@ class PuntoVentaView(tk.Frame):
 
         self._render_carrito()
 
-        bottom_frame = tk.Frame(self, bg=self.app.COLOR_FONDO_EXTERIOR)
-        bottom_frame.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+        # Historial de Ventas - Tercera columna
+        historial_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
+        historial_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(15, 0))
 
-        historial_frame = tk.Frame(bottom_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=15)
-        historial_frame.pack(fill=tk.BOTH, expand=True)
-
+        # Header con título y botón
+        header_frame = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
         tk.Label(
-            historial_frame,
+            header_frame,
             text="Historial de Ventas",
             font=("Arial", 12, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
-        ).pack(anchor="w", pady=(0, 10))
+        ).pack(side=tk.LEFT)
+        
+        tk.Button(
+            header_frame,
+            text="🗑 Reiniciar",
+            font=("Arial", 8, "bold"),
+            bg="#FF5722",
+            fg="white",
+            relief=tk.FLAT,
+            padx=8,
+            pady=2,
+            command=self._reiniciar_historial_ventas
+        ).pack(side=tk.RIGHT)
 
         # Container for tree and scrollbar
         tree_container = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
-        tree_container.pack(fill=tk.X, expand=False)
+        tree_container.pack(fill=tk.BOTH, expand=True)
 
         scrollbar = tk.Scrollbar(tree_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -293,6 +353,131 @@ class PuntoVentaView(tk.Frame):
 
         self._cargar_historial()
 
+    # --- Métodos de productos ---
+    def _actualizar_fondo_donaciones(self):
+        """Actualizar el fondo de donaciones y equivalente en tortillas"""
+        try:
+            from models.donacion_model import DonacionModel
+            total_donaciones = DonacionModel.obtener_total()
+            
+            # Actualizar fondo
+            self.fondo_var.set(f"${total_donaciones:.2f} MXN")
+            
+            # Calcular equivalente en tortillas (asumiendo $25 por kg)
+            precio_tortilla_kg = 25.0
+            kg_equivalente = total_donaciones / precio_tortilla_kg if precio_tortilla_kg > 0 else 0
+            self.equivalente_var.set(f"{kg_equivalente:.0f} kg")
+            
+        except Exception as e:
+            print(f"Error actualizando fondo de donaciones: {e}")
+            self.fondo_var.set("$0.00 MXN")
+            self.equivalente_var.set("0 kg")
+    
+    def _solicitar_contrasena(self):
+        """Solicitar contraseña del usuario para operaciones sensibles"""
+        from tkinter import simpledialog, messagebox
+        
+        # Get current user's password from main app if available
+        password = simpledialog.askstring(
+            "Autenticación Requerida",
+            "Ingrese su contraseña para continuar:",
+            show='*'
+        )
+        
+        if not password:
+            return False
+        
+        # Validate password with current user
+        try:
+            from models.usuario_model import UsuarioModel
+            
+            # Get user ID from main app
+            if hasattr(self.app, 'usuario_data') and self.app.usuario_data:
+                user_id = self.app.usuario_data.get('id_usuario')
+                if user_id:
+                    user = UsuarioModel.validar_credenciales(str(user_id), password)
+                    if user:
+                        return True
+            
+            messagebox.showerror("Error", "Contraseña incorrecta")
+            return False
+        except Exception as e:
+            print(f"Error validando contraseña: {e}")
+            messagebox.showerror("Error", "No se pudo validar la contraseña")
+            return False
+    
+    def _reiniciar_fondo_donaciones(self):
+        """Reiniciar el fondo de donaciones a cero"""
+        from tkinter import messagebox
+        
+        # Solicitar contraseña
+        if not self._solicitar_contrasena():
+            return
+        
+        # Confirmar con el usuario
+        confirmacion = messagebox.askyesno(
+            "Confirmar Reinicio",
+            "¿Está seguro que desea reiniciar el fondo de donaciones a $0?\n\n"
+            "Esta acción eliminará todos los registros de donaciones.\n"
+            "Solo debe hacerse después de entregar las tortillas a las familias."
+        )
+        
+        if not confirmacion:
+            return
+        
+        try:
+            from database import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # Eliminar todas las donaciones
+            supabase.table('donacion').delete().neq('id_donacion', 0).execute()
+            
+            # Actualizar display
+            self._actualizar_fondo_donaciones()
+            messagebox.showinfo("Éxito", "El fondo de donaciones ha sido reiniciado a $0.00")
+            
+        except Exception as e:
+            print(f"Error reiniciando fondo de donaciones: {e}")
+            messagebox.showerror("Error", f"No se pudo reiniciar el fondo: {str(e)}")
+    
+    def _reiniciar_historial_ventas(self):
+        """Reiniciar el historial de ventas"""
+        from tkinter import messagebox
+        
+        # Solicitar contraseña
+        if not self._solicitar_contrasena():
+            return
+        
+        # Confirmar con el usuario
+        confirmacion = messagebox.askyesno(
+            "Confirmar Reinicio",
+            "¿Está seguro que desea reiniciar el historial de ventas?\n\n"
+            "Esta acción eliminará TODOS los registros de ventas.\n"
+            "Esta operación es IRREVERSIBLE."
+        )
+        
+        if not confirmacion:
+            return
+        
+        try:
+            from database import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # Eliminar todas las ventas (esto también eliminará items y donaciones por cascade)
+            supabase.table('venta_completa').delete().neq('id_venta_completa', 0).execute()
+            
+            # Recargar historial
+            self._cargar_historial()
+            
+            # Actualizar donaciones también
+            self._actualizar_fondo_donaciones()
+            
+            messagebox.showinfo("Éxito", "El historial de ventas ha sido reiniciado")
+            
+        except Exception as e:
+            print(f"Error reiniciando historial: {e}")
+            messagebox.showerror("Error", f"No se pudo reiniciar el historial: {str(e)}")
+    
     # --- Métodos de productos ---
     def _render_productos(self):
         """Renderizar lista de productos filtrados"""
@@ -465,35 +650,70 @@ class PuntoVentaView(tk.Frame):
         except ValueError:
             pago = 0.0
         
-        # Si está marcado "donar el cambio", el cambio es 0
+        
+        # Si está marcado "donar el cambio", el cambio es 0 y mostramos la donación
         if self.redondeo_var.get() and pago >= total:
+            donacion = pago - total
             cambio = 0.0
-            self.cambio_label.config(text=f"Cambio: $ {cambio:.2f} (donado)", fg="green")
+            self.cambio_label.config(text=f"Cambio: ${cambio:.2f} (Donación: ${donacion:.2f})", fg="green")
         else:
             cambio = pago - total
             self.cambio_label.config(text=f"Cambio: $ {cambio:.2f}", fg="green" if cambio >= 0 else "red")
 
+    def _validar_numero_decimal(self, new_value):
+        """Valida que la entrada sea un número decimal válido o vacío"""
+        if new_value == "":
+            return True
+        try:
+            float(new_value)
+            return True
+        except ValueError:
+            return False
+
     def _completar_venta(self):
         from tkinter import messagebox
         
+        # Obtener totales actuales para verificar
+        _, total_a_pagar, _ = self.controller.calcular_totales()
+
         # Obtener monto de pago
         try:
             monto_pago = float(self.pago_var.get())
         except ValueError:
             monto_pago = 0.0
+            
+        # Validar que el pago sea suficiente
+        # Si hay redondeo y el pago es mayor o igual, ya se maneja en el cobro,
+        # pero aquí aseguramos que cubra el monto.
         
-        id_venta = self.controller.procesar_venta(monto_pago=monto_pago)
+        # Nota: Si el total es 0 (todo gratis o error), pasa. 
+        # Pero si hay total, debe pagar.
+        # Nota: Si el total es 0 (todo gratis o error), pasa. 
+        # Pero si hay total, debe pagar.
+        if total_a_pagar > 0 and monto_pago < total_a_pagar:
+            falta = total_a_pagar - monto_pago
+            messagebox.showwarning("Pago Insuficiente", f"El monto recibido es menor al total.\\nFaltan: ${falta:.2f}")
+            return
         
-        if id_venta:
-            messagebox.showinfo("Venta Exitosa", f"Venta registrada correctamente.\\nID: {id_venta}")
-            self.pago_var.set("0")  # Reset payment field
-            self._render_carrito()
-            self._cargar_historial()
-        else:
-            if not self.controller.carrito:
-                messagebox.showwarning("Carrito Vacío", "Agregue productos antes de completar la venta.")
+        try:
+            id_venta = self.controller.procesar_venta(monto_pago=monto_pago)
+            
+            if id_venta:
+                messagebox.showinfo("Venta Exitosa", f"Venta registrada correctamente.\\nID: {id_venta}")
+                self.pago_var.set("0")  # Reset payment field
+                self._render_carrito()
+                self._cargar_historial()
+                # Refrescar lista de productos (stock actualizado)
+                self._filtrar_productos()
+                # Actualizar fondo de donaciones
+                self._actualizar_fondo_donaciones()
             else:
-                messagebox.showerror("Error", "Ocurrió un error al procesar la venta.")
+                if not self.controller.carrito:
+                    messagebox.showwarning("Carrito Vacío", "Agregue productos antes de completar la venta.")
+                else:
+                    messagebox.showerror("Error", "Ocurrió un error al procesar la venta.")
+        except ValueError as ve:
+            messagebox.showerror("Stock Insuficiente", str(ve))
 
     def _ordenar_columna(self, tree, col, reverse):
         """Ordenar treeview por columna"""

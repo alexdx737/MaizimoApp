@@ -8,7 +8,7 @@ from models.usuario_model import UsuarioModel
 COLOR_TEXTO_PRIMARIO = "#333333"
 COLOR_BOTON_FONDO = "#FDB813"
 COLOR_BOTON_TEXTO = "white"
-COLOR_FONDO_EXTERIOR = "#f0f0f0"
+COLOR_FONDO_EXTERIOR = "#FFF8E1"  # Creamy yellow
 COLOR_FONDO_INTERIOR = "#ffffff"
 
 class RegistroView:
@@ -28,20 +28,6 @@ class RegistroView:
         window_height = 768
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
-        center_x = int(screen_width/2 - window_width/2)
-        center_y = int(screen_height/2 - window_height/2)
-        
-        self.root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
-        self.root.configure(bg=self.COLOR_FONDO_EXTERIOR)
-        
-        # Frame principal con scroll
-        self.main_frame = tk.Frame(root, bg=self.COLOR_FONDO_EXTERIOR)
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Canvas para scroll
-        self.canvas = tk.Canvas(self.main_frame, bg=self.COLOR_FONDO_EXTERIOR, highlightthickness=0)
-        self.scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = tk.Frame(self.canvas, bg=self.COLOR_FONDO_INTERIOR, padx=40, pady=30)
         
         self.scrollable_frame.bind(
             "<Configure>",
@@ -61,6 +47,12 @@ class RegistroView:
     
     def _on_mousewheel(self, event):
         self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    
+    def _validar_curp(self, new_value):
+        """Valida longitud máxima del CURP"""
+        if len(new_value) > 18:
+            return False
+        return True
     
     def crear_widgets(self):
         row = 0
@@ -114,7 +106,18 @@ class RegistroView:
                  font=("Arial", 11, "bold"), fg=self.COLOR_TEXTO_PRIMARIO, 
                  bg=self.COLOR_FONDO_INTERIOR).grid(row=row, column=0, columnspan=2, sticky="w", pady=(5, 0))
         row += 1
-        self.curp_entry = tk.Entry(self.scrollable_frame, width=50, font=("Arial", 11), bd=1, relief=tk.FLAT)
+        # Registrar validación CURP
+        vcmd_curp = (self.main_frame.register(self._validar_curp), '%P')
+        
+        self.curp_entry = tk.Entry(
+            self.scrollable_frame, 
+            width=50, 
+            font=("Arial", 11), 
+            bd=1, 
+            relief=tk.FLAT,
+            validate="key",
+            validatecommand=vcmd_curp
+        )
         self.curp_entry.grid(row=row, column=0, columnspan=2, pady=(2, 10), ipady=5, sticky="ew")
         row += 1
         
@@ -192,20 +195,6 @@ class RegistroView:
         rol_frame = tk.Frame(self.scrollable_frame, bg=self.COLOR_FONDO_INTERIOR)
         rol_frame.grid(row=row, column=0, columnspan=2, pady=(2, 20), sticky="w")
         tk.Radiobutton(rol_frame, text="Trabajador", variable=self.rol_var, value="trabajador", 
-                      bg=self.COLOR_FONDO_INTERIOR, font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 15))
-        tk.Radiobutton(rol_frame, text="Administrador", variable=self.rol_var, value="administrador", 
-                      bg=self.COLOR_FONDO_INTERIOR, font=("Arial", 10)).pack(side=tk.LEFT)
-        row += 1
-        
-        # --- Botones ---
-        button_frame = tk.Frame(self.scrollable_frame, bg=self.COLOR_FONDO_INTERIOR)
-        button_frame.grid(row=row, column=0, columnspan=2, pady=(20, 10))
-        
-        tk.Button(button_frame, text="Registrarse", command=self.registrar_usuario,
-                  bg=self.COLOR_BOTON_FONDO, fg=self.COLOR_BOTON_TEXTO,
-                  font=("Arial", 12, "bold"), width=20, height=1, bd=0, relief=tk.FLAT,
-                  activebackground="#D39210", activeforeground=self.COLOR_BOTON_TEXTO).pack(side=tk.LEFT, padx=5)
-        
         tk.Button(button_frame, text="Volver al Login", command=self.volver_login,
                   bg="#666666", fg="white",
                   font=("Arial", 12, "bold"), width=20, height=1, bd=0, relief=tk.FLAT,
