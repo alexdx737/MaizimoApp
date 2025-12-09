@@ -445,13 +445,32 @@ class PuntoVentaView(tk.Frame):
         dashboard_inner = tk.Frame(dashboard_frame, bg=self.app.COLOR_FONDO_INTERIOR)
         dashboard_inner.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
         
+        # Header with title and refresh button
+        dashboard_header = tk.Frame(dashboard_inner, bg=self.app.COLOR_FONDO_INTERIOR)
+        dashboard_header.pack(fill=tk.X, pady=(0, 15))
+        
         tk.Label(
-            dashboard_inner,
+            dashboard_header,
             text="📊 Dashboard de Ventas (Últimos 7 días)",
             font=("Segoe UI", 13, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
-        ).pack(anchor="w", pady=(0, 15))
+        ).pack(side=tk.LEFT)
+        
+        # Refresh button
+        ctk.CTkButton(
+            dashboard_header,
+            text="🔄 Actualizar",
+            font=("Segoe UI", 9, "bold"),
+            fg_color="#4CAF50",
+            text_color="white",
+            hover_color="#45A049",
+            corner_radius=8,
+            height=32,
+            width=100,
+            cursor="hand2",
+            command=self._generar_graficos
+        ).pack(side=tk.RIGHT)
         
         # Charts container with grid layout
         charts_frame = tk.Frame(dashboard_inner, bg=self.app.COLOR_FONDO_INTERIOR)
@@ -896,6 +915,8 @@ class PuntoVentaView(tk.Frame):
                 self._filtrar_productos()
                 # Actualizar fondo de donaciones
                 self._actualizar_fondo_donaciones()
+                # Actualizar gráficos del dashboard
+                self._generar_graficos()
             else:
                 if not self.controller.carrito:
                     messagebox.showwarning("Carrito Vacío", "Agregue productos antes de completar la venta.")
@@ -1055,13 +1076,79 @@ class PuntoVentaView(tk.Frame):
             tk.Label(total_frame, text="Donación: No se realizó donación", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e", pady=(5, 0))
 
     def _generar_graficos(self):
-        """Generar los tres gráficos del dashboard"""
+        """Generar los tres gráficos del dashboard de forma asíncrona"""
+        import threading
+        
+        # Mostrar indicador de carga
+        self._mostrar_cargando()
+        
+        # Ejecutar generación en thread separado para no bloquear UI
+        thread = threading.Thread(target=self._generar_graficos_thread, daemon=True)
+        thread.start()
+    
+    def _mostrar_cargando(self):
+        """Mostrar indicador de carga en los gráficos"""
+        for widget in self.chart1_frame.winfo_children():
+            widget.destroy()
+        for widget in self.chart2_frame.winfo_children():
+            widget.destroy()
+        for widget in self.chart3_frame.winfo_children():
+            widget.destroy()
+        
+        tk.Label(
+            self.chart1_frame,
+            text="⏳ Cargando...",
+            font=("Arial", 11),
+            fg="#666",
+            bg="white"
+        ).pack(expand=True)
+        
+        tk.Label(
+            self.chart2_frame,
+            text="⏳ Cargando...",
+            font=("Arial", 11),
+            fg="#666",
+            bg="white"
+        ).pack(expand=True)
+        
+        tk.Label(
+            self.chart3_frame,
+            text="⏳ Cargando...",
+            font=("Arial", 11),
+            fg="#666",
+            bg="white"
+        ).pack(expand=True)
+    
+    def _generar_graficos_thread(self):
+        """Generar los tres gráficos del dashboard (ejecutado en thread)"""
         # Import controller here to avoid circular imports
         from controllers.responsabilidad_social_controller import ResponsabilidadSocialController
         
         # Create temporary controller instance for chart data
         rs_controller = ResponsabilidadSocialController()
         
+        # Obtener datos en el thread
+        try:
+            clientes_labels, clientes_values = rs_controller.obtener_datos_top_clientes(limit=10, dias=7)
+            productos_labels, productos_values = rs_controller.obtener_datos_top_productos(limit=10, dias=7)
+            dist_labels, dist_sizes, dist_colors = rs_controller.obtener_datos_distribucion(dias=7)
+        except Exception as e:
+            print(f"Error obteniendo datos para gráficos: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+        
+        # Actualizar UI en el hilo principal
+        self.after(0, lambda: self._renderizar_graficos(
+            clientes_labels, clientes_values,
+            productos_labels, productos_values,
+            dist_labels, dist_sizes, dist_colors
+        ))
+    
+    def _renderizar_graficos(self, clientes_labels, clientes_values, 
+                            productos_labels, productos_values,
+                            dist_labels, dist_sizes, dist_colors):
+        """Renderizar gráficos con los datos obtenidos (ejecutado en UI thread)"""
         # Limpiar gráficos anteriores
         for canvas in self.chart_canvases:
             try:
@@ -1080,12 +1167,10 @@ class PuntoVentaView(tk.Frame):
         
         # Gráfico 1: Top Clientes
         try:
-            labels, values = rs_controller.obtener_datos_top_clientes(limit=10, dias=7)
-            
-            if labels and values:
+            if clientes_labels and clientes_values:
                 fig1 = Figure(figsize=(5, 3.5), dpi=100)
                 ax1 = fig1.add_subplot(111)
-                ax1.barh(labels, values, color='#3498DB')
+                ax1.barh(clientes_labels, clientes_values, color='#3498DB')
                 ax1.set_xlabel('Total Vendido ($)', fontweight='bold', fontsize=9)
                 ax1.set_title('Top 10 Clientes por Ventas', fontweight='bold', fontsize=11, pad=10)
                 ax1.grid(axis='x', alpha=0.3)
@@ -1118,12 +1203,10 @@ class PuntoVentaView(tk.Frame):
         
         # Gráfico 2: Top Productos
         try:
-            labels, values = rs_controller.obtener_datos_top_productos(limit=10, dias=7)
-            
-            if labels and values:
+            if productos_labels and productos_values:
                 fig2 = Figure(figsize=(5, 3.5), dpi=100)
                 ax2 = fig2.add_subplot(111)
-                ax2.barh(labels, values, color='#2ECC71')
+                ax2.barh(productos_labels, productos_values, color='#2ECC71')
                 ax2.set_xlabel('Ingresos ($)', fontweight='bold', fontsize=9)
                 ax2.set_title('Top 10 Productos Más Vendidos', fontweight='bold', fontsize=11, pad=10)
                 ax2.grid(axis='x', alpha=0.3)
@@ -1156,12 +1239,10 @@ class PuntoVentaView(tk.Frame):
         
         # Gráfico 3: Distribución
         try:
-            labels, sizes, colors = rs_controller.obtener_datos_distribucion(dias=7)
-            
-            if labels and sizes:
+            if dist_labels and dist_sizes:
                 fig3 = Figure(figsize=(4.5, 4.5), dpi=100)
                 ax3 = fig3.add_subplot(111)
-                ax3.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%',
+                ax3.pie(dist_sizes, labels=dist_labels, colors=dist_colors, autopct='%1.1f%%',
                        startangle=90, textprops={'fontsize': 10, 'fontweight': 'bold'})
                 ax3.set_title('Distribución de Ingresos', fontweight='bold', fontsize=12, pad=15)
                 fig3.tight_layout()
