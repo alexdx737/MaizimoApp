@@ -20,10 +20,8 @@ class PuntoVentaView(tk.Frame):
         # Registrar validación para entradas numéricas
         self.vcmd_decimal = (self.register(self._validar_numero_decimal), '%P')
         
-        # Create canvas and scrollbars for scrolling
+        # Create canvas for scrolling (no visible scrollbars, gesture-only)
         canvas = tk.Canvas(self, bg=self.app.COLOR_FONDO_EXTERIOR, highlightthickness=0)
-        scrollbar_v = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
-        scrollbar_h = tk.Scrollbar(self, orient="horizontal", command=canvas.xview)
         scrollable_frame = tk.Frame(canvas, bg=self.app.COLOR_FONDO_EXTERIOR)
         
         scrollable_frame.bind(
@@ -32,17 +30,19 @@ class PuntoVentaView(tk.Frame):
         )
         
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar_v.set, xscrollcommand=scrollbar_h.set)
         
-        # Pack scrollbars and canvas
-        scrollbar_h.pack(side="bottom", fill="x")
-        scrollbar_v.pack(side="right", fill="y")
+        # Pack canvas
         canvas.pack(side="left", fill="both", expand=True)
         
-        # Enable mousewheel scrolling
+        # Enable mousewheel/touchpad scrolling
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         canvas.bind("<MouseWheel>", _on_mousewheel)
+        
+        # Enable horizontal scrolling with Shift+MouseWheel
+        def _on_horizontal_mousewheel(event):
+            canvas.xview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind("<Shift-MouseWheel>", _on_horizontal_mousewheel)
         
         top_info = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
         top_info.pack(fill=tk.X)
@@ -153,12 +153,11 @@ class PuntoVentaView(tk.Frame):
             width=20
         ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
-        # Canvas y scrollbar para lista de productos
+        # Canvas para lista de productos (sin scrollbar visible, solo gestos)
         canvas_frame = tk.Frame(productos_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
         self.productos_canvas = tk.Canvas(canvas_frame, bg=self.app.COLOR_FONDO_INTERIOR, highlightthickness=0)
-        scrollbar_productos = tk.Scrollbar(canvas_frame, orient="vertical", command=self.productos_canvas.yview)
         self.productos_lista_frame = tk.Frame(self.productos_canvas, bg=self.app.COLOR_FONDO_INTERIOR)
 
         self.productos_lista_frame.bind(
@@ -167,10 +166,13 @@ class PuntoVentaView(tk.Frame):
         )
 
         self.productos_canvas.create_window((0, 0), window=self.productos_lista_frame, anchor="nw")
-        self.productos_canvas.configure(yscrollcommand=scrollbar_productos.set)
 
-        self.productos_canvas.pack(side="left", fill="both", expand=True)
-        scrollbar_productos.pack(side="right", fill="y")
+        self.productos_canvas.pack(fill="both", expand=True)
+        
+        # Enable mousewheel/touchpad scrolling for products list
+        def _on_productos_mousewheel(event):
+            self.productos_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        self.productos_canvas.bind("<MouseWheel>", _on_productos_mousewheel)
 
         self._render_productos()
 
@@ -379,12 +381,9 @@ class PuntoVentaView(tk.Frame):
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(side=tk.LEFT)
 
-        # Container for tree and scrollbar
+        # Container for tree (sin scrollbar visible, solo gestos)
         tree_container = tk.Frame(historial_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         tree_container.pack(fill=tk.BOTH, expand=True)
-
-        scrollbar = tk.Scrollbar(tree_container)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Configure Treeview style for distinct headers
         style = ttk.Style()
@@ -403,18 +402,42 @@ class PuntoVentaView(tk.Frame):
                        font=("Segoe UI", 9))
 
         columnas = ("id", "fecha", "hora", "total", "redondeo", "donacion")
-        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=10, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
-        
-        scrollbar.config(command=self.tree.yview)
+        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=10, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
 
         for col, texto in zip(columnas[1:], ["Fecha", "Hora", "Total", "Redondeo", "Donación"]):
             self.tree.heading(col, text=texto, command=lambda c=col: self._ordenar_columna(self.tree, c, False))
             self.tree.column(col, width=100, anchor="center")
 
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Enable mousewheel/touchpad scrolling for tree
+        def _on_tree_mousewheel(event):
+            self.tree.yview_scroll(int(-1*(event.delta/120)), "units")
+        self.tree.bind("<MouseWheel>", _on_tree_mousewheel)
         self.tree.bind("<Double-1>", self._on_tree_double_click)
 
         self._cargar_historial()
+        
+        # Bind mousewheel to all widgets for scrolling from anywhere
+        self._bind_mousewheel_recursively(self, canvas)
+
+    def _bind_mousewheel_recursively(self, widget, canvas):
+        """Bind mousewheel events to widget and all its children for scrolling"""
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def _on_horizontal_mousewheel(event):
+            canvas.xview_scroll(int(-1*(event.delta/120)), "units")
+        
+        # Bind to this widget
+        widget.bind("<MouseWheel>", _on_mousewheel)
+        widget.bind("<Shift-MouseWheel>", _on_horizontal_mousewheel)
+        
+        # Recursively bind to all children
+        for child in widget.winfo_children():
+            # Skip the productos_canvas and tree to avoid conflicts with their own scrolling
+            if child != getattr(self, 'productos_canvas', None) and child != getattr(self, 'tree', None):
+                self._bind_mousewheel_recursively(child, canvas)
 
     # --- Métodos de productos ---
     def _actualizar_fondo_donaciones(self):
