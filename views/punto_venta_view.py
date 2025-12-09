@@ -1,6 +1,10 @@
 import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
 
 
@@ -9,6 +13,7 @@ class PuntoVentaView(tk.Frame):
         super().__init__(parent, bg=app.COLOR_FONDO_EXTERIOR)
         self.app = app
         self.controller = controller
+        self.chart_canvases = []  # Store chart canvases for cleanup
 
         # Recargar datos al abrir la vista para asegurar que esté actualizada
         self.controller.cargar_clientes()
@@ -428,6 +433,50 @@ class PuntoVentaView(tk.Frame):
         self.tree.bind("<Double-1>", self._on_tree_double_click)
 
         self._cargar_historial()
+        
+        # ===== DASHBOARD SECTION =====
+        dashboard_container = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
+        dashboard_container.pack(fill=tk.BOTH, expand=True, pady=(10, 10))
+        
+        # Dashboard frame with inner padding
+        dashboard_frame = ctk.CTkFrame(dashboard_container, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
+        dashboard_frame.pack(fill=tk.BOTH, expand=True)
+        
+        dashboard_inner = tk.Frame(dashboard_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        dashboard_inner.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
+        
+        tk.Label(
+            dashboard_inner,
+            text="📊 Dashboard de Ventas (Últimos 7 días)",
+            font=("Segoe UI", 13, "bold"),
+            fg=self.app.COLOR_TEXTO_PRIMARIO,
+            bg=self.app.COLOR_FONDO_INTERIOR,
+        ).pack(anchor="w", pady=(0, 15))
+        
+        # Charts container with grid layout
+        charts_frame = tk.Frame(dashboard_inner, bg=self.app.COLOR_FONDO_INTERIOR)
+        charts_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Configure grid
+        charts_frame.columnconfigure(0, weight=1)
+        charts_frame.columnconfigure(1, weight=1)
+        charts_frame.rowconfigure(0, weight=1)
+        charts_frame.rowconfigure(1, weight=1)
+        
+        # Chart 1: Top Clientes (top-left)
+        self.chart1_frame = tk.Frame(charts_frame, bg="white", relief=tk.SOLID, bd=1)
+        self.chart1_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=(0, 5))
+        
+        # Chart 2: Top Productos (bottom-left)
+        self.chart2_frame = tk.Frame(charts_frame, bg="white", relief=tk.SOLID, bd=1)
+        self.chart2_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 5), pady=(5, 0))
+        
+        # Chart 3: Distribución (right side, spanning both rows)
+        self.chart3_frame = tk.Frame(charts_frame, bg="white", relief=tk.SOLID, bd=1)
+        self.chart3_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(5, 0))
+        
+        # Generate charts
+        self._generar_graficos()
         
         # Bind mousewheel to all widgets for scrolling from anywhere
         self._bind_mousewheel_recursively(self, canvas)
@@ -1004,5 +1053,141 @@ class PuntoVentaView(tk.Frame):
                 tk.Label(total_frame, text="Donación: No se realizó donación", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e", pady=(5, 0))
         else:
             tk.Label(total_frame, text="Donación: No se realizó donación", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e", pady=(5, 0))
+
+    def _generar_graficos(self):
+        """Generar los tres gráficos del dashboard"""
+        # Import controller here to avoid circular imports
+        from controllers.responsabilidad_social_controller import ResponsabilidadSocialController
+        
+        # Create temporary controller instance for chart data
+        rs_controller = ResponsabilidadSocialController()
+        
+        # Limpiar gráficos anteriores
+        for canvas in self.chart_canvases:
+            try:
+                canvas.get_tk_widget().destroy()
+            except:
+                pass
+        self.chart_canvases = []
+        
+        # Limpiar frames
+        for widget in self.chart1_frame.winfo_children():
+            widget.destroy()
+        for widget in self.chart2_frame.winfo_children():
+            widget.destroy()
+        for widget in self.chart3_frame.winfo_children():
+            widget.destroy()
+        
+        # Gráfico 1: Top Clientes
+        try:
+            labels, values = rs_controller.obtener_datos_top_clientes(limit=10, dias=7)
+            
+            if labels and values:
+                fig1 = Figure(figsize=(5, 3.5), dpi=100)
+                ax1 = fig1.add_subplot(111)
+                ax1.barh(labels, values, color='#3498DB')
+                ax1.set_xlabel('Total Vendido ($)', fontweight='bold', fontsize=9)
+                ax1.set_title('Top 10 Clientes por Ventas', fontweight='bold', fontsize=11, pad=10)
+                ax1.grid(axis='x', alpha=0.3)
+                ax1.tick_params(axis='both', labelsize=8)
+                fig1.tight_layout()
+                
+                canvas1 = FigureCanvasTkAgg(fig1, master=self.chart1_frame)
+                canvas1.draw()
+                canvas1.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+                self.chart_canvases.append(canvas1)
+            else:
+                tk.Label(
+                    self.chart1_frame,
+                    text="No hay datos de clientes\npara mostrar",
+                    font=("Arial", 10),
+                    fg="#999",
+                    bg="white"
+                ).pack(expand=True)
+        except Exception as e:
+            print(f"Error generando gráfico de clientes: {e}")
+            import traceback
+            traceback.print_exc()
+            tk.Label(
+                self.chart1_frame,
+                text="Error al cargar gráfico",
+                font=("Arial", 10),
+                fg="red",
+                bg="white"
+            ).pack(expand=True)
+        
+        # Gráfico 2: Top Productos
+        try:
+            labels, values = rs_controller.obtener_datos_top_productos(limit=10, dias=7)
+            
+            if labels and values:
+                fig2 = Figure(figsize=(5, 3.5), dpi=100)
+                ax2 = fig2.add_subplot(111)
+                ax2.barh(labels, values, color='#2ECC71')
+                ax2.set_xlabel('Ingresos ($)', fontweight='bold', fontsize=9)
+                ax2.set_title('Top 10 Productos Más Vendidos', fontweight='bold', fontsize=11, pad=10)
+                ax2.grid(axis='x', alpha=0.3)
+                ax2.tick_params(axis='both', labelsize=8)
+                fig2.tight_layout()
+                
+                canvas2 = FigureCanvasTkAgg(fig2, master=self.chart2_frame)
+                canvas2.draw()
+                canvas2.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+                self.chart_canvases.append(canvas2)
+            else:
+                tk.Label(
+                    self.chart2_frame,
+                    text="No hay datos de productos\npara mostrar",
+                    font=("Arial", 10),
+                    fg="#999",
+                    bg="white"
+                ).pack(expand=True)
+        except Exception as e:
+            print(f"Error generando gráfico de productos: {e}")
+            import traceback
+            traceback.print_exc()
+            tk.Label(
+                self.chart2_frame,
+                text="Error al cargar gráfico",
+                font=("Arial", 10),
+                fg="red",
+                bg="white"
+            ).pack(expand=True)
+        
+        # Gráfico 3: Distribución
+        try:
+            labels, sizes, colors = rs_controller.obtener_datos_distribucion(dias=7)
+            
+            if labels and sizes:
+                fig3 = Figure(figsize=(4.5, 4.5), dpi=100)
+                ax3 = fig3.add_subplot(111)
+                ax3.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%',
+                       startangle=90, textprops={'fontsize': 10, 'fontweight': 'bold'})
+                ax3.set_title('Distribución de Ingresos', fontweight='bold', fontsize=12, pad=15)
+                fig3.tight_layout()
+                
+                canvas3 = FigureCanvasTkAgg(fig3, master=self.chart3_frame)
+                canvas3.draw()
+                canvas3.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+                self.chart_canvases.append(canvas3)
+            else:
+                tk.Label(
+                    self.chart3_frame,
+                    text="No hay datos de distribución\npara mostrar",
+                    font=("Arial", 10),
+                    fg="#999",
+                    bg="white"
+                ).pack(expand=True)
+        except Exception as e:
+            print(f"Error generando gráfico de distribución: {e}")
+            import traceback
+            traceback.print_exc()
+            tk.Label(
+                self.chart3_frame,
+                text="Error al cargar gráfico",
+                font=("Arial", 10),
+                fg="red",
+                bg="white"
+            ).pack(expand=True)
 
 

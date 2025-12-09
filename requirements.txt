@@ -2,10 +2,17 @@
 supabase
 psycopg2-binary
 python-dotenv
-customtkinter
+
 
 # UI
 Pillow
+customtkinter
 
 # Seguridad
 bcrypt
+
+
+#otros
+pandas
+reportlab
+matplotlib

@@ -70,3 +70,144 @@ class ResponsabilidadSocialController:
         except Exception as e:
             print(f"Error cargando donaciones: {e}")
             self.donaciones = []
+    
+    def obtener_datos_top_clientes(self, limit=10, dias=7):
+        """
+        Obtener datos para gráfico de Top Clientes por Ventas
+        Args:
+            limit: Número de clientes a mostrar (default: 10)
+            dias: Días hacia atrás para consultar (default: 7)
+        Returns: tuple (labels, values) para matplotlib
+        """
+        try:
+            from models.venta_model import VentaModel
+            from datetime import datetime, timedelta
+            import pandas as pd
+            
+            # Calcular rango de fechas
+            fecha_fin = datetime.now().date()
+            fecha_inicio = fecha_fin - timedelta(days=dias)
+            
+            # Obtener ventas
+            ventas = VentaModel.listar_ventas(
+                fecha_inicio=fecha_inicio.isoformat(),
+                fecha_fin=fecha_fin.isoformat(),
+                limit=1000
+            )
+            
+            # Agrupar por cliente
+            ventas_data = []
+            for venta in ventas:
+                cliente_info = venta.get('cliente', {})
+                cliente_nombre = f"{cliente_info.get('nombre', 'General')} {cliente_info.get('apellido_paterno', '')}".strip()
+                total_venta = float(venta.get('monto_total', 0))
+                ventas_data.append({'Cliente': cliente_nombre, 'Total': total_venta})
+            
+            if not ventas_data:
+                return [], []
+            
+            df = pd.DataFrame(ventas_data)
+            df_grouped = df.groupby('Cliente')['Total'].sum().sort_values(ascending=True).tail(limit)
+            
+            return df_grouped.index.tolist(), df_grouped.values.tolist()
+            
+        except Exception as e:
+            print(f"Error obteniendo datos de top clientes: {e}")
+            return [], []
+    
+    def obtener_datos_top_productos(self, limit=10, dias=7):
+        """
+        Obtener datos para gráfico de Top Productos Más Vendidos
+        Args:
+            limit: Número de productos a mostrar (default: 10)
+            dias: Días hacia atrás para consultar (default: 7)
+        Returns: tuple (labels, values) para matplotlib
+        """
+        try:
+            from models.venta_model import VentaModel
+            from datetime import datetime, timedelta
+            import pandas as pd
+            
+            # Calcular rango de fechas
+            fecha_fin = datetime.now().date()
+            fecha_inicio = fecha_fin - timedelta(days=dias)
+            
+            # Obtener ventas
+            ventas = VentaModel.listar_ventas(
+                fecha_inicio=fecha_inicio.isoformat(),
+                fecha_fin=fecha_fin.isoformat(),
+                limit=1000
+            )
+            
+            # Recopilar productos vendidos
+            productos_data = []
+            for venta in ventas:
+                venta_detalle = VentaModel.obtener_venta_completa(venta['id_venta_completa'])
+                if venta_detalle and venta_detalle.get('items'):
+                    for item in venta_detalle['items']:
+                        producto = item.get('producto', {})
+                        productos_data.append({
+                            'Producto': producto.get('nombre', 'N/A'),
+                            'Total': round(item.get('subtotal', 0), 2)
+                        })
+            
+            if not productos_data:
+                return [], []
+            
+            df = pd.DataFrame(productos_data)
+            df_grouped = df.groupby('Producto')['Total'].sum().sort_values(ascending=True).tail(limit)
+            
+            return df_grouped.index.tolist(), df_grouped.values.tolist()
+            
+        except Exception as e:
+            print(f"Error obteniendo datos de top productos: {e}")
+            return [], []
+    
+    def obtener_datos_distribucion(self, dias=7):
+        """
+        Obtener datos para gráfico de Distribución de Ingresos (Ventas vs Donaciones)
+        Args:
+            dias: Días hacia atrás para consultar (default: 7)
+        Returns: tuple (labels, sizes, colors) para matplotlib pie chart
+        """
+        try:
+            from models.venta_model import VentaModel
+            from datetime import datetime, timedelta
+            import pandas as pd
+            
+            # Calcular rango de fechas
+            fecha_fin = datetime.now().date()
+            fecha_inicio = fecha_fin - timedelta(days=dias)
+            
+            # Obtener ventas
+            ventas = VentaModel.listar_ventas(
+                fecha_inicio=fecha_inicio.isoformat(),
+                fecha_fin=fecha_fin.isoformat(),
+                limit=1000
+            )
+            
+            total_ventas = 0.0
+            total_donaciones = 0.0
+            
+            for venta in ventas:
+                total_ventas += float(venta.get('monto_total', 0))
+                
+                # Obtener donaciones
+                donaciones = venta.get('donacion', [])
+                if isinstance(donaciones, list) and len(donaciones) > 0:
+                    total_donaciones += float(donaciones[0].get('monto_redondeo', 0))
+                elif isinstance(donaciones, dict):
+                    total_donaciones += float(donaciones.get('monto_redondeo', 0))
+            
+            if total_ventas == 0 and total_donaciones == 0:
+                return [], [], []
+            
+            labels = [f'Ventas\n${total_ventas:.2f}', f'Donaciones\n${total_donaciones:.2f}']
+            sizes = [total_ventas, total_donaciones]
+            colors = ['#3498DB', '#F39C12']
+            
+            return labels, sizes, colors
+            
+        except Exception as e:
+            print(f"Error obteniendo datos de distribución: {e}")
+            return [], [], []
