@@ -127,7 +127,6 @@ class PuntoVentaView(tk.Frame):
         mid_frame.columnconfigure(1, weight=1, minsize=250)
         mid_frame.columnconfigure(2, weight=1, minsize=250)
         mid_frame.rowconfigure(0, weight=1)
-        print("✓ Grid layout configurado para Punto de Venta (3 columnas responsivas)")
 
         productos_frame = ctk.CTkFrame(mid_frame, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
         productos_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))

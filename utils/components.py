@@ -125,6 +125,31 @@ class RoundedEntry(tk.Frame):
             self.canvas.create_text(20, height/2, text=self.icon_char, fill=COLORS["text_secondary"], font=("Segoe UI Symbol", 12))
             self.padding_left = 40
             
+        # Eye icon for password (Trailing) - Use a real Button instead of canvas text
+        self.eye_padding_right = 15  # Default padding
+        if self.show_char == "*":
+            self.eye_visible = False
+            self.eye_padding_right = 50  # More space for eye icon
+            
+            # Create a Button widget for the eye icon instead of canvas text
+            eye_x = width - 25
+            eye_y = height / 2
+            
+            self.eye_button = tk.Button(
+                self.canvas,
+                text="👁",
+                font=("Segoe UI Symbol", 12),
+                fg=COLORS["text_secondary"],
+                bg=COLORS["background_card"],
+                bd=0,
+                relief=tk.FLAT,
+                cursor="hand2",
+                activebackground=COLORS["background_card"],
+                command=self.toggle_password_click
+            )
+            # Place the button on the canvas
+            self.canvas.create_window(eye_x, eye_y, window=self.eye_button, anchor="center")
+        
         # Entry Widget real (child of canvas to clip correctly if window)
         # Note: using canvas.create_window places it "inside" the canvas layout
         self.entry = tk.Entry(self.canvas, textvariable=self.entry_var, font=FONTS["body"], 
@@ -137,16 +162,9 @@ class RoundedEntry(tk.Frame):
         self.entry.bind("<FocusIn>", self.on_focus_in)
         self.entry.bind("<FocusOut>", self.on_focus_out)
         
-        # Place entry on top of canvas using create_window
-        self.entry_window = self.canvas.create_window(self.padding_left, height/2, window=self.entry, anchor="w", width=width-self.padding_left-40)
-
-        # Eye icon for password (Trailing)
-        if self.show_char == "*":
-            self.eye_visible = False
-            self.eye_btn = self.canvas.create_text(width-25, height/2, text="👁", fill=COLORS["text_secondary"], font=("Segoe UI Symbol", 12))
-            self.canvas.tag_bind(self.eye_btn, "<Button-1>", self.toggle_password)
-            self.canvas.tag_bind(self.eye_btn, "<Enter>", lambda e: self.canvas.configure(cursor="hand2"))
-            self.canvas.tag_bind(self.eye_btn, "<Leave>", lambda e: self.canvas.configure(cursor=""))
+        # Place entry on top of canvas using create_window - adjusted width to not cover eye icon
+        entry_width = width - self.padding_left - self.eye_padding_right
+        self.entry_window = self.canvas.create_window(self.padding_left, height/2, window=self.entry, anchor="w", width=entry_width)
 
     def draw_border(self, color):
         self.canvas.delete("border")
@@ -184,12 +202,23 @@ class RoundedEntry(tk.Frame):
 
     def toggle_password(self, event):
         self.eye_visible = not self.eye_visible
+        print(f"Toggle password - eye_visible: {self.eye_visible}")  # Debug
         if self.eye_visible:
             self.entry.config(show="")
             self.canvas.itemconfigure(self.eye_btn, fill=COLORS["primary"])
         else:
             self.entry.config(show="*")
             self.canvas.itemconfigure(self.eye_btn, fill=COLORS["text_secondary"])
+    
+    def toggle_password_click(self):
+        """Toggle password visibility - Button command version"""
+        self.eye_visible = not self.eye_visible
+        if self.eye_visible:
+            self.entry.config(show="")
+            self.eye_button.config(fg=COLORS["primary"])
+        else:
+            self.entry.config(show="*")
+            self.eye_button.config(fg=COLORS["text_secondary"])
 
     def get(self):
         return self.entry.get()
