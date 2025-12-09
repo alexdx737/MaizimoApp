@@ -2,6 +2,7 @@
 supabase
 psycopg2-binary
 python-dotenv
+customtkinter
 
 # UI
 Pillow

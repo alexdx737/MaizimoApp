@@ -29,7 +29,12 @@ class PuntoVentaView(tk.Frame):
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        
+        # Bind canvas resize to update scrollable_frame width
+        def _on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        canvas.bind("<Configure>", _on_canvas_configure)
         
         # Pack canvas
         canvas.pack(side="left", fill="both", expand=True)
@@ -116,9 +121,16 @@ class PuntoVentaView(tk.Frame):
 
         mid_frame = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
         mid_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # Configure grid layout for responsive columns
+        mid_frame.columnconfigure(0, weight=1, minsize=250)
+        mid_frame.columnconfigure(1, weight=1, minsize=250)
+        mid_frame.columnconfigure(2, weight=1, minsize=250)
+        mid_frame.rowconfigure(0, weight=1)
+        print("✓ Grid layout configurado para Punto de Venta (3 columnas responsivas)")
 
         productos_frame = ctk.CTkFrame(mid_frame, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
-        productos_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        productos_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
         # Inner frame for padding
         productos_inner = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
@@ -177,7 +189,7 @@ class PuntoVentaView(tk.Frame):
         self._render_productos()
 
         carrito_frame = ctk.CTkFrame(mid_frame, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
-        carrito_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+        carrito_frame.grid(row=0, column=1, sticky="nsew", padx=5)
         
         # Inner frame for padding
         carrito_inner = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
@@ -333,7 +345,7 @@ class PuntoVentaView(tk.Frame):
 
         # Historial de Ventas - Tercera columna
         historial_frame = ctk.CTkFrame(mid_frame, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
-        historial_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+        historial_frame.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         
         # Inner frame for padding
         historial_inner = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
