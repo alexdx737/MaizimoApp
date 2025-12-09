@@ -4,13 +4,8 @@ from PIL import Image, ImageTk
 from models.usuario_model import UsuarioModel
 from main_view import MainApp
 import os
-
-# Colores globales
-COLOR_TEXTO_PRIMARIO = "#333333"
-COLOR_BOTON_FONDO = "#FDB813"
-COLOR_BOTON_TEXTO = "white"
-COLOR_FONDO_EXTERIOR = "#FFF8E1"  # Creamy yellow
-COLOR_FONDO_INTERIOR = "#ffffff"
+from utils.theme import COLORS, FONTS, DIMENSIONS
+from utils.components import RoundedButton, RoundedEntry
 
 def validar_credenciales(usuario, password):
     """Wrapper para validar credenciales usando el modelo"""
@@ -28,13 +23,6 @@ class LoginView:
         self.root = root    
         self.root.title("Maizimo App - Iniciar Sesión")
         
-        # Definir colores de instancia
-        self.COLOR_TEXTO_PRIMARIO = COLOR_TEXTO_PRIMARIO
-        self.COLOR_BOTON_FONDO = COLOR_BOTON_FONDO
-        self.COLOR_BOTON_TEXTO = COLOR_BOTON_TEXTO
-        self.COLOR_FONDO_EXTERIOR = COLOR_FONDO_EXTERIOR
-        self.COLOR_FONDO_INTERIOR = COLOR_FONDO_INTERIOR
-        
         # Configuración de ventana
         window_width = 1024
         window_height = 768
@@ -44,128 +32,114 @@ class LoginView:
         center_y = int(screen_height/2 - window_height/2)
         
         self.root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
-        self.root.configure(bg=self.COLOR_FONDO_EXTERIOR)
+        self.root.configure(bg=COLORS["background_main"])
         
-        # Centrar el Frame principal en la ventana
-        self.frame_login = tk.Frame(root, bg=self.COLOR_FONDO_INTERIOR, padx=40, pady=40, bd=1, relief=tk.FLAT, highlightbackground="#D0D0D0", highlightthickness=1)
+        # Frame principal (Tarjeta centrada)
+        # Usamos Canvas para dibujar el borde redondeado de la tarjeta si fuera necesario, 
+        # pero un Frame blanco limpio funciona bien para este estilo "Clean"
+        self.frame_login = tk.Frame(root, bg=COLORS["background_card"], padx=60, pady=60)
         self.frame_login.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        
+        # Sombra simple (Frame gris oscuro detrás)
+        self.shadow_frame = tk.Frame(root, bg="#E0E0E0")
+        self.shadow_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER, width=505, height=605) # Ligeramente más grande
+        self.frame_login.lift() # Asegurar que la tarjeta esté encima
 
         self.crear_widgets()
 
     def cargar_imagen(self):
-        # Usar el logo de Maizimo
-        ruta_imagen = "maizimo_logo.png" 
-        
+        # Usar el logo de Maizimo o Texto estilizado
         try:
+            ruta_imagen = "assets/maizimo_logo.png" 
+            if not os.path.exists(ruta_imagen):
+                 ruta_imagen = "maizimo_logo.png"
+                 
             if os.path.exists(ruta_imagen):
-                img = Image.open(ruta_imagen).resize((200, 200), Image.LANCZOS)
+                # Logo más pequeño y estilizado
+                img = Image.open(ruta_imagen).resize((80, 80), Image.LANCZOS)
                 self.perfil_img = ImageTk.PhotoImage(img)
-                img_label = tk.Label(self.frame_login, image=self.perfil_img, bg=self.COLOR_FONDO_INTERIOR)
-                img_label.grid(row=0, column=0, columnspan=2, pady=(10, 20)) 
+                img_label = tk.Label(self.frame_login, image=self.perfil_img, bg=COLORS["background_card"])
+                img_label.pack(pady=(0, 10))
             else:
-                raise FileNotFoundError
+                # Título estilo Badge si no hay logo
+               raise FileNotFoundError
         except Exception:
-            # Placeholder si no hay imagen
-            lbl = tk.Label(self.frame_login, text="MAIZIMO", font=("Arial", 20, "bold"), 
-                     width=10, height=2, bg="#FDB813", fg="white")
-            lbl.grid(row=0, column=0, columnspan=2, pady=(10, 20))
-            
+             # Badge estético "MAIZIMO"
+             badge_frame = tk.Frame(self.frame_login, bg=COLORS["primary"], padx=20, pady=5)
+             badge_frame.pack(pady=(0, 10))
+             tk.Label(badge_frame, text="MAIZIMO", font=("Segoe UI", 16, "bold"), 
+                      bg=COLORS["primary"], fg="white").pack()
+
     def crear_widgets(self):
         self.cargar_imagen()
         
-        # --- Títulos ---
-        tk.Label(self.frame_login, text="Maizimo App", 
-                 font=("Arial", 24, "bold"), fg=self.COLOR_TEXTO_PRIMARIO, 
-                 bg=self.COLOR_FONDO_INTERIOR).grid(row=1, column=0, columnspan=2, pady=(0, 5))
+        # Título
+        tk.Label(self.frame_login, text="MAIZIMO", font=("Segoe UI", 24, "bold"), 
+                 bg=COLORS["background_card"], fg="#D4A319").pack(pady=(0, 5))
+                 
+        tk.Label(self.frame_login, text="Sistema de Gestión Integral", font=("Segoe UI", 11), 
+                 bg=COLORS["background_card"], fg=COLORS["text_secondary"]).pack(pady=(0, 30))
+
+        # --- Inputs ---
         
-        tk.Label(self.frame_login, text="Sistema de Gestión Integral", 
-                 font=("Arial", 11), fg=self.COLOR_TEXTO_PRIMARIO, 
-                 bg=self.COLOR_FONDO_INTERIOR).grid(row=2, column=0, columnspan=2, pady=(0, 30))
-
-        # --- Campo de Usuario ---
-        tk.Label(self.frame_login, text="ID Usuario", anchor="w", 
-                 font=("Arial", 12, "bold"), fg=self.COLOR_TEXTO_PRIMARIO, 
-                 bg=self.COLOR_FONDO_INTERIOR).grid(row=3, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        # Usuario
+        tk.Label(self.frame_login, text="ID Usuario", font=("Segoe UI", 10, "bold"), 
+                 bg=COLORS["background_card"], fg=COLORS["text_primary"], anchor="w").pack(fill="x", pady=(0, 5))
         
-        self.username_entry = tk.Entry(self.frame_login, width=40, font=("Arial", 12), bd=1, relief=tk.FLAT)
-        self.username_entry.insert(0, "Ingrese su ID (ej: 1)")
-        self.username_entry.bind("<FocusIn>", self._clear_placeholder)
-        self.username_entry.bind("<FocusOut>", self._restore_placeholder)
-        self.username_entry.grid(row=4, column=0, columnspan=2, pady=(5, 15), ipady=5)
+        self.username_entry = RoundedEntry(self.frame_login, width=380, height=45, 
+                                           placeholder="Ingrese su ID", icon="👤")
+        self.username_entry.pack(pady=(0, 20))
 
-        # --- Campo de Contraseña ---
-        tk.Label(self.frame_login, text="Contraseña", anchor="w", 
-                 font=("Arial", 12, "bold"), fg=self.COLOR_TEXTO_PRIMARIO, 
-                 bg=self.COLOR_FONDO_INTERIOR).grid(row=5, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        # Contraseña
+        tk.Label(self.frame_login, text="Contraseña", font=("Segoe UI", 10, "bold"), 
+                 bg=COLORS["background_card"], fg=COLORS["text_primary"], anchor="w").pack(fill="x", pady=(0, 5))
         
-        self.password_entry = tk.Entry(self.frame_login, width=40, font=("Arial", 12), show="*", bd=1, relief=tk.FLAT)
-        self.password_entry.insert(0, "Ingrese su contraseña")
-        self.password_entry.bind("<FocusIn>", self._clear_placeholder_password)
-        self.password_entry.bind("<FocusOut>", self._restore_placeholder_password)
-        self.password_entry.grid(row=6, column=0, columnspan=2, pady=(5, 50), ipady=5)
+        self.password_entry = RoundedEntry(self.frame_login, width=380, height=45, 
+                                           placeholder="********", show="*", icon="🔒")
+        self.password_entry.pack(pady=(0, 30))
+
+        # --- Botones ---
         
-        # --- Botón de Iniciar Sesión ---
-        tk.Button(self.frame_login, text="Iniciar Sesión", command=self.Login,
-                  bg=self.COLOR_BOTON_FONDO, fg=self.COLOR_BOTON_TEXTO,
-                  font=("Arial", 14, "bold"), width=30, height=1, bd=0, relief=tk.FLAT,
-                  activebackground="#D39210", activeforeground=self.COLOR_BOTON_TEXTO).grid(row=7, column=0, columnspan=2, pady=(0, 10))
+        # Iniciar Sesión (Relleno)
+        self.btn_login = RoundedButton(self.frame_login, text="Iniciar Sesión", width=380, height=45,
+                                       bg_color=COLORS["primary"], text_color="white",
+                                       hover_color=COLORS["primary_hover"],
+                                       command=self.Login)
+        self.btn_login.pack(pady=(0, 15))
         
-        # --- Botón de Registrarse ---
-        tk.Button(self.frame_login, text="Registrarse", command=self.abrir_registro,
-                  bg="#666666", fg="white",
-                  font=("Arial", 12, "bold"), width=30, height=1, bd=0, relief=tk.FLAT,
-                  activebackground="#555555", activeforeground="white").grid(row=8, column=0, columnspan=2, pady=(0, 0))
+        # Registrarse (Borde)
+        self.btn_registro = RoundedButton(self.frame_login, text="Registrarse", width=380, height=45,
+                                          bg_color=COLORS["background_card"], text_color=COLORS["text_secondary"],
+                                          border_color=COLORS["primary"], hover_color=COLORS["primary"],
+                                          command=self.abrir_registro)
+        self.btn_registro.pack()
 
-    # --- Métodos de Placeholder ---
-    def _clear_placeholder(self, event):
-        if self.username_entry.get() == "Ingrese su ID (ej: 1)":
-            self.username_entry.delete(0, tk.END)
-
-    def _restore_placeholder(self, event):
-        if not self.username_entry.get():
-            self.username_entry.insert(0, "Ingrese su ID (ej: 1)")
-
-    def _clear_placeholder_password(self, event):
-        current_text = self.password_entry.get()
-        if current_text == "Ingrese su contraseña":
-            self.password_entry.config(show="*")
-            self.password_entry.delete(0, tk.END)
-
-    def _restore_placeholder_password(self, event):
-        if not self.password_entry.get():
-            self.password_entry.config(show="") 
-            self.password_entry.insert(0, "Ingrese su contraseña")
-
-    # --- Lógica de Login ---
     def Login(self):
-        usuario = self.username_entry.get().strip()
-        password = self.password_entry.get().strip()
+        usuario_val = self.username_entry.get().strip()
+        password_val = self.password_entry.get().strip()
         
-        if usuario == "Ingrese su ID (ej: 1)": usuario = ""
-        if password == "Ingrese su contraseña": password = ""
-
-        if not usuario or not password:
+        if not usuario_val or not password_val:
             messagebox.showwarning("Faltan datos", "Por favor ingresa usuario y contraseña.")
             return
             
-        # Validación de tipo de dato (ID debe ser numérico)
-        if not usuario.isdigit():
-            messagebox.showerror("Error de formato", "El Usuario debe ser el ID numérico (ej: 1).")
+        if not usuario_val.isdigit():
+            messagebox.showerror("Error", "El ID de usuario debe ser numérico.")
             return
         
         try:
-            user = UsuarioModel.validar_credenciales(usuario, password)
+            user = UsuarioModel.validar_credenciales(usuario_val, password_val)
             if user:
-                messagebox.showinfo("Acceso concedido", f"Bienvenido!")
+                # Transición suave (opcional) o mensaje
                 self.root.destroy()
                 run_main_app(usuario_data=user)
             else:
                 messagebox.showerror("Acceso denegado", "ID o contraseña incorrectos.")
         except Exception as e:
-            messagebox.showerror("Error", f"Ocurrió un error al conectar: {e}")
+            messagebox.showerror("Error", f"Error de conexión: {e}")
+            import traceback
+            traceback.print_exc()
     
     def abrir_registro(self):
-        """Abrir la ventana de registro"""
         self.root.destroy()
         from registro_view import RegistroView
         root = tk.Tk()
@@ -173,7 +147,7 @@ class LoginView:
         root.mainloop()
 
 if __name__ == "__main__":
-    print("Iniciando interfaz gráfica...")
+    print("Iniciando interfaz gráfica con tema Blossom...")
     root = tk.Tk()
     app = LoginView(root)
     root.mainloop()

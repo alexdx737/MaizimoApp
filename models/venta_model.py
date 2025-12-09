@@ -9,14 +9,12 @@ class VentaModel:
     """Model for venta and venta_completa tables"""
     
     @staticmethod
-    def crear_venta_completa(id_cliente, monto_total, descuento_bolsa=False, 
-                            descripcion=None, fecha=None, hora=None):
+    def crear_venta_completa(id_cliente, monto_total, descripcion=None, fecha=None, hora=None):
         """
         Create a complete sale record
         Args:
             id_cliente: Client ID
-            monto_total: Total amount
-            descuento_bolsa: Bag discount applied
+            monto_total: Total amount (already includes all discounts applied)
             descripcion: Optional description
             fecha: Sale date (default: today)
             hora: Sale time (default: now)
@@ -35,7 +33,6 @@ class VentaModel:
                 'monto_total': monto_total,
                 'id_cliente': id_cliente,
                 'hora': hora,
-                'descuento_bolsa': descuento_bolsa,
                 'descripcion': descripcion
             }
             
@@ -95,12 +92,23 @@ class VentaModel:
         Returns: venta_completa ID or None
         """
         try:
-            # Calculate total
+            from models.cliente_model import ClienteModel
+            
+            # Calculate subtotal
             subtotal = sum(item['precio'] * item['cantidad'] for item in carrito)
             
-            # Apply bag discount
-            descuento = 2.0 if descuento_bolsa and subtotal >= 2.0 else 0.0
-            total = max(subtotal - descuento, 0.0)
+            # Get client discount percentage
+            cliente = ClienteModel.obtener_por_id(id_cliente)
+            descuento_porcentaje = cliente.get('descuento', 0) if cliente else 0
+            
+            # Calculate client discount amount
+            descuento_cliente_monto = (subtotal * descuento_porcentaje / 100.0) if descuento_porcentaje > 0 else 0.0
+            
+            # Apply bag discount (fixed $2.00)
+            descuento_bolsa_monto = 2.0 if descuento_bolsa and subtotal >= 2.0 else 0.0
+            
+            # Calculate total
+            total = max(subtotal - descuento_cliente_monto - descuento_bolsa_monto, 0.0)
             
             # Calculate donation from change (if redondeo is enabled and customer paid more than total)
             if redondeo and monto_pago > total:
@@ -108,11 +116,10 @@ class VentaModel:
             else:
                 monto_donacion = 0.0
             
-            # Create venta_completa
+            # Create venta_completa (total already includes all discounts)
             venta_completa = VentaModel.crear_venta_completa(
                 id_cliente=id_cliente,
                 monto_total=total,
-                descuento_bolsa=descuento_bolsa,
                 descripcion=f"Venta con {len(carrito)} productos"
             )
             
@@ -145,13 +152,13 @@ class VentaModel:
     
     @staticmethod
     def obtener_venta_completa(id_venta_completa):
-        """Get complete sale with all items"""
+        """Get complete sale with all items and donation info"""
         try:
             supabase = get_supabase_client()
             
-            # Get venta_completa
+            # Get venta_completa with cliente and donacion
             response = supabase.table('venta_completa')\
-                .select('*, cliente(*)')\
+                .select('*, cliente(*), donacion(*)')\
                 .eq('id_venta_completa', id_venta_completa)\
                 .execute()
             

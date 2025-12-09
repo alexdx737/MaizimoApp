@@ -125,3 +125,39 @@ class UsuarioModel:
     def desactivar(id_usuario):
         """Deactivate a user"""
         return UsuarioModel.actualizar(id_usuario, activo=False)
+    
+    @staticmethod
+    def cambiar_contraseña(id_usuario, contraseña_actual, contraseña_nueva):
+        """
+        Change user password
+        Args:
+            id_usuario: User ID
+            contraseña_actual: Current password for validation
+            contraseña_nueva: New password (max 50 characters)
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Validate current password
+            usuario = UsuarioModel.obtener_por_id(id_usuario)
+            if not usuario:
+                print("Usuario no encontrado")
+                return False
+            
+            if usuario['contraseña'] != contraseña_actual:
+                print("Contraseña actual incorrecta")
+                return False
+            
+            # Validate new password length
+            if len(contraseña_nueva) > 50:
+                print("Error: Contraseña debe tener máximo 50 caracteres")
+                return False
+            
+            # Update password
+            result = UsuarioModel.actualizar(id_usuario, contraseña=contraseña_nueva)
+            return result is not None
+            
+        except Exception as e:
+            print(f"Error cambiando contraseña: {e}")
+            return False
+

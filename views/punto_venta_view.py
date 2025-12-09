@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
+import customtkinter as ctk
+
 
 
 class PuntoVentaView(tk.Frame):
@@ -18,9 +20,10 @@ class PuntoVentaView(tk.Frame):
         # Registrar validación para entradas numéricas
         self.vcmd_decimal = (self.register(self._validar_numero_decimal), '%P')
         
-        # Create canvas and scrollbar for scrolling
+        # Create canvas and scrollbars for scrolling
         canvas = tk.Canvas(self, bg=self.app.COLOR_FONDO_EXTERIOR, highlightthickness=0)
-        scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        scrollbar_v = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        scrollbar_h = tk.Scrollbar(self, orient="horizontal", command=canvas.xview)
         scrollable_frame = tk.Frame(canvas, bg=self.app.COLOR_FONDO_EXTERIOR)
         
         scrollable_frame.bind(
@@ -29,24 +32,31 @@ class PuntoVentaView(tk.Frame):
         )
         
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.configure(yscrollcommand=scrollbar_v.set, xscrollcommand=scrollbar_h.set)
         
+        # Pack scrollbars and canvas
+        scrollbar_h.pack(side="bottom", fill="x")
+        scrollbar_v.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
         
         # Enable mousewheel scrolling
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas.bind("<MouseWheel>", _on_mousewheel)
         
         top_info = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
         top_info.pack(fill=tk.X)
 
-        fondo_frame = tk.Frame(top_info, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=15, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
-        fondo_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 15), pady=8)
+        fondo_frame = ctk.CTkFrame(top_info, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15, height=150)
+        fondo_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10), pady=10)
+        fondo_frame.pack_propagate(False)
+        
+        # Inner frame for padding
+        fondo_inner = tk.Frame(fondo_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        fondo_inner.pack(fill=tk.BOTH, expand=True, padx=25, pady=20)
 
         tk.Label(
-            fondo_frame,
+            fondo_inner,
             text="Fondo de Redondeo",
             font=("Arial", 10, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
@@ -55,18 +65,23 @@ class PuntoVentaView(tk.Frame):
         
         self.fondo_var = tk.StringVar(value="$0.00 MXN")
         tk.Label(
-            fondo_frame,
+            fondo_inner,
             textvariable=self.fondo_var,
             font=("Arial", 12),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(anchor="w", pady=(5, 0))
 
-        eq_frame = tk.Frame(top_info, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=15, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
-        eq_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(15, 0), pady=8)
+        eq_frame = ctk.CTkFrame(top_info, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15, height=150)
+        eq_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0), pady=10)
+        eq_frame.pack_propagate(False)
+        
+        # Inner frame for padding
+        eq_inner = tk.Frame(eq_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        eq_inner.pack(fill=tk.BOTH, expand=True, padx=25, pady=20)
 
         tk.Label(
-            eq_frame,
+            eq_inner,
             text="Equivalente en Tortillas",
             font=("Arial", 10, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
@@ -75,7 +90,7 @@ class PuntoVentaView(tk.Frame):
         
         self.equivalente_var = tk.StringVar(value="0 kg")
         tk.Label(
-            eq_frame,
+            eq_inner,
             textvariable=self.equivalente_var,
             font=("Arial", 12),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
@@ -86,34 +101,39 @@ class PuntoVentaView(tk.Frame):
         self._actualizar_fondo_donaciones()
         
         # Botón para reiniciar el fondo
-        tk.Button(
-            fondo_frame,
-            text="🔄 Reiniciar Fondo",
-            font=("Arial", 9, "bold"),
-            bg="#FF5722",
-            fg="white",
-            relief=tk.FLAT,
-            padx=10,
-            pady=3,
+        ctk.CTkButton(
+            fondo_inner,
+            text="Reiniciar Fondo",
+            font=("Segoe UI", 9, "bold"),
+            fg_color=self.app.COLOR_BOTON_FONDO,
+            text_color="white",
+            hover_color=self.app.COLOR_BOTON_FONDO,
+            corner_radius=8,
+            height=32,
+            cursor="hand2",
             command=self._reiniciar_fondo_donaciones
-        ).pack(anchor="w", pady=(10, 0))
+        ).pack(anchor="w", pady=(12, 0))
 
         mid_frame = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
         mid_frame.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        productos_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
-        productos_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
+        productos_frame = ctk.CTkFrame(mid_frame, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
+        productos_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        # Inner frame for padding
+        productos_inner = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        productos_inner.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
 
         tk.Label(
-            productos_frame,
+            productos_inner,
             text="Productos",
-            font=("Arial", 12, "bold"),
+            font=("Segoe UI", 13, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=(0, 10))
 
         # Buscador de productos
-        buscar_frame = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        buscar_frame = tk.Frame(productos_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         buscar_frame.pack(fill=tk.X, pady=(5, 10))
 
         tk.Label(
@@ -134,7 +154,7 @@ class PuntoVentaView(tk.Frame):
         ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
         # Canvas y scrollbar para lista de productos
-        canvas_frame = tk.Frame(productos_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        canvas_frame = tk.Frame(productos_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
         self.productos_canvas = tk.Canvas(canvas_frame, bg=self.app.COLOR_FONDO_INTERIOR, highlightthickness=0)
@@ -154,19 +174,23 @@ class PuntoVentaView(tk.Frame):
 
         self._render_productos()
 
-        carrito_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
-        carrito_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=15)
+        carrito_frame = ctk.CTkFrame(mid_frame, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
+        carrito_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+        
+        # Inner frame for padding
+        carrito_inner = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        carrito_inner.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
 
         tk.Label(
-            carrito_frame,
+            carrito_inner,
             text="Carrito de Venta",
-            font=("Arial", 12, "bold"),
+            font=("Segoe UI", 13, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=(0, 10))
 
         # Selección de cliente mayorista
-        cliente_frame = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        cliente_frame = tk.Frame(carrito_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         cliente_frame.pack(fill=tk.X, pady=(5, 10))
 
         tk.Label(
@@ -194,11 +218,11 @@ class PuntoVentaView(tk.Frame):
         cliente_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
         cliente_combo.bind("<<ComboboxSelected>>", self._on_cliente_seleccionado)
 
-        self.carrito_items_frame = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        self.carrito_items_frame = tk.Frame(carrito_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         self.carrito_items_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 5))
 
         self.subtotal_label = tk.Label(
-            carrito_frame,
+            carrito_inner,
             text="Subtotal: $0.00",
             font=("Arial", 11),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
@@ -208,7 +232,7 @@ class PuntoVentaView(tk.Frame):
 
         # Label para mostrar descuento de cliente
         self.descuento_cliente_label = tk.Label(
-            carrito_frame,
+            carrito_inner,
             text="Descuento Cliente: $0.00",
             font=("Arial", 10),
             fg="green",
@@ -249,7 +273,7 @@ class PuntoVentaView(tk.Frame):
         ).pack(anchor="w")
 
         self.total_label = tk.Label(
-            carrito_frame,
+            carrito_inner,
             text="Total a Pagar: $0.00",
             font=("Arial", 11, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
@@ -258,7 +282,7 @@ class PuntoVentaView(tk.Frame):
         self.total_label.pack(anchor="e", pady=(8, 4))
 
         # Pago y Cambio
-        pago_frame = tk.Frame(carrito_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        pago_frame = tk.Frame(carrito_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         pago_frame.pack(fill=tk.X, pady=(5, 0))
 
         tk.Label(
@@ -282,7 +306,7 @@ class PuntoVentaView(tk.Frame):
         self.pago_entry.bind("<KeyRelease>", lambda e: self._recalcular_totales())
 
         self.cambio_label = tk.Label(
-            carrito_frame,
+            carrito_inner,
             text="Cambio: $0.00",
             font=("Arial", 11, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
@@ -290,57 +314,96 @@ class PuntoVentaView(tk.Frame):
         )
         self.cambio_label.pack(anchor="e", pady=(5, 4))
 
-        tk.Button(
-            carrito_frame,
+        ctk.CTkButton(
+            carrito_inner,
             text="Completar Venta",
-            font=("Arial", 12, "bold"),
-            bg=self.app.COLOR_BOTON_FONDO,
-            fg=self.app.COLOR_BOTON_TEXTO,
-            relief=tk.FLAT,
-            padx=10,
-            pady=6,
+            font=("Segoe UI", 11, "bold"),
+            fg_color=self.app.COLOR_BOTON_FONDO,
+            text_color="white",
+            hover_color=self.app.COLOR_BOTON_FONDO,
+            corner_radius=8,
+            height=40,
+            cursor="hand2",
             command=self._completar_venta,
-        ).pack(fill=tk.X, pady=(0, 0))
+        ).pack(fill=tk.X, pady=(10, 0))
 
         self._render_carrito()
 
         # Historial de Ventas - Tercera columna
-        historial_frame = tk.Frame(mid_frame, bg=self.app.COLOR_FONDO_INTERIOR, padx=20, pady=20, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
-        historial_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(15, 0))
+        historial_frame = ctk.CTkFrame(mid_frame, fg_color=self.app.COLOR_FONDO_INTERIOR, corner_radius=15)
+        historial_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+        
+        # Inner frame for padding
+        historial_inner = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        historial_inner.pack(fill=tk.BOTH, expand=True, padx=25, pady=25)
 
         # Header con título y botón
-        header_frame = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        header_frame = tk.Frame(historial_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         header_frame.pack(fill=tk.X, pady=(0, 10))
         
+        # Pack buttons first (right to left)
+        ctk.CTkButton(
+            header_frame,
+            text="🗑 Reiniciar",
+            font=("Segoe UI", 8, "bold"),
+            fg_color="#E57373",
+            text_color="white",
+            hover_color="#D32F2F",
+            corner_radius=6,
+            width=75,
+            height=26,
+            cursor="hand2",
+            command=self._reiniciar_historial_ventas
+        ).pack(side=tk.RIGHT, padx=(5, 0))
+        
+        ctk.CTkButton(
+            header_frame,
+            text="📊 Reporte Semanal",
+            font=("Segoe UI", 8, "bold"),
+            fg_color="#81C784",
+            text_color="white",
+            hover_color="#66BB6A",
+            corner_radius=6,
+            width=115,
+            height=26,
+            cursor="hand2",
+            command=self._generar_reporte_semanal
+        ).pack(side=tk.RIGHT, padx=(5, 0))
+        
+        # Then pack label (left side)
         tk.Label(
             header_frame,
             text="Historial de Ventas",
-            font=("Arial", 12, "bold"),
+            font=("Segoe UI", 13, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
         ).pack(side=tk.LEFT)
-        
-        tk.Button(
-            header_frame,
-            text="🗑 Reiniciar",
-            font=("Arial", 8, "bold"),
-            bg="#FF5722",
-            fg="white",
-            relief=tk.FLAT,
-            padx=8,
-            pady=2,
-            command=self._reiniciar_historial_ventas
-        ).pack(side=tk.RIGHT)
 
         # Container for tree and scrollbar
-        tree_container = tk.Frame(historial_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        tree_container = tk.Frame(historial_inner, bg=self.app.COLOR_FONDO_INTERIOR)
         tree_container.pack(fill=tk.BOTH, expand=True)
 
         scrollbar = tk.Scrollbar(tree_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Configure Treeview style for distinct headers
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("Treeview.Heading",
+                       background=self.app.COLOR_BOTON_FONDO,
+                       foreground="white",
+                       font=("Segoe UI", 10, "bold"),
+                       relief="flat")
+        style.map("Treeview.Heading",
+                 background=[('active', self.app.COLOR_BOTON_FONDO)])
+        style.configure("Treeview",
+                       background="white",
+                       fieldbackground="white",
+                       foreground=self.app.COLOR_TEXTO_PRIMARIO,
+                       font=("Segoe UI", 9))
 
         columnas = ("id", "fecha", "hora", "total", "redondeo", "donacion")
-        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=12, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
+        self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", height=10, yscrollcommand=scrollbar.set, displaycolumns=("fecha", "hora", "total", "redondeo", "donacion"))
         
         scrollbar.config(command=self.tree.yview)
 
@@ -478,6 +541,46 @@ class PuntoVentaView(tk.Frame):
             print(f"Error reiniciando historial: {e}")
             messagebox.showerror("Error", f"No se pudo reiniciar el historial: {str(e)}")
     
+    def _generar_reporte_semanal(self):
+        """Generar y descargar reporte semanal de ventas en Excel"""
+        from tkinter import filedialog, messagebox
+        from datetime import datetime
+        
+        try:
+            # Generar nombre de archivo por defecto
+            fecha_actual = datetime.now().strftime("%Y%m%d")
+            nombre_archivo = f"reporte_semanal_{fecha_actual}.pdf"
+            
+            # Abrir diálogo para guardar archivo
+            ruta_archivo = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+                initialfile=nombre_archivo,
+                title="Guardar Reporte Semanal"
+            )
+            
+            # Si el usuario canceló, salir
+            if not ruta_archivo:
+                return
+            
+            # Generar el reporte
+            exito = self.controller.generar_reporte_semanal(ruta_archivo)
+            
+            if exito:
+                messagebox.showinfo(
+                    "Éxito", 
+                    f"Reporte semanal generado correctamente.\n\nArchivo guardado en:\n{ruta_archivo}"
+                )
+            else:
+                messagebox.showerror(
+                    "Error", 
+                    "No se pudo generar el reporte semanal."
+                )
+                
+        except Exception as e:
+            print(f"Error generando reporte: {e}")
+            messagebox.showerror("Error", f"Ocurrió un error al generar el reporte:\n{str(e)}")
+    
     # --- Métodos de productos ---
     def _render_productos(self):
         """Renderizar lista de productos filtrados"""
@@ -509,14 +612,17 @@ class PuntoVentaView(tk.Frame):
                 bg=self.app.COLOR_FONDO_INTERIOR,
             ).pack(side=tk.LEFT, padx=5)
 
-            tk.Button(
+            ctk.CTkButton(
                 item_frame,
                 text="+",
-                font=("Arial", 10, "bold"),
-                bg=self.app.COLOR_BOTON_FONDO,
-                fg=self.app.COLOR_BOTON_TEXTO,
-                width=3,
-                relief=tk.FLAT,
+                font=("Segoe UI", 11, "bold"),
+                fg_color=self.app.COLOR_BOTON_FONDO,
+                text_color="white",
+                hover_color=self.app.COLOR_BOTON_FONDO,
+                corner_radius=8,
+                width=35,
+                height=28,
+                cursor="hand2",
                 command=lambda n=nombre, p=precio: self.agregar_al_carrito(n, p),
             ).pack(side=tk.RIGHT)
     
@@ -772,7 +878,7 @@ class PuntoVentaView(tk.Frame):
 
         popup = tk.Toplevel(self)
         popup.title(f"Detalle de Venta #{id_venta}")
-        popup.geometry("500x400")
+        popup.geometry("550x550")
         popup.configure(bg=self.app.COLOR_FONDO_EXTERIOR)
 
         # Header
@@ -781,6 +887,13 @@ class PuntoVentaView(tk.Frame):
 
         tk.Label(header, text=f"Venta #{id_venta}", font=("Arial", 14, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w")
         tk.Label(header, text=f"Fecha: {venta['fecha']} {venta['hora'][:5]}", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w")
+        
+        # Información del cliente
+        cliente_info = venta.get('cliente')
+        if cliente_info:
+            cliente_nombre = cliente_info.get('nombre', 'N/A')
+            cliente_descuento = cliente_info.get('descuento', 0)
+            tk.Label(header, text=f"Cliente: {cliente_nombre} (Descuento: {cliente_descuento:.0f}%)", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="w")
         
         # Items
         items_frame = tk.Frame(popup, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=10)
@@ -823,9 +936,39 @@ class PuntoVentaView(tk.Frame):
             tk.Label(row, text=f"{cantidad}", width=8, anchor="center", font=("Arial", 9), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
             tk.Label(row, text=f"${subtotal:.2f}", width=10, anchor="e", font=("Arial", 9), bg=self.app.COLOR_FONDO_INTERIOR).pack(side=tk.LEFT)
 
-        # Totales
+        # Totales y detalles
         total_frame = tk.Frame(popup, bg=self.app.COLOR_FONDO_INTERIOR, padx=15, pady=10)
         total_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        # Calcular subtotal (suma de items)
+        subtotal_items = sum(item['subtotal'] for item in venta.get('items', []))
+        
+        # Mostrar subtotal
+        tk.Label(total_frame, text=f"Subtotal: ${subtotal_items:.2f}", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e")
+        
+        # Separador
+        tk.Frame(total_frame, height=1, bg="#D0D0D0").pack(fill=tk.X, pady=5)
+        
+        # Total
+        tk.Label(total_frame, text=f"Total: ${venta['monto_total']:.2f}", font=("Arial", 12, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e")
+        
+        # Mostrar donación si aplica
+        donaciones = venta.get('donacion', [])
+        # Supabase returns donations as a list (1:N relationship)
+        if isinstance(donaciones, list) and len(donaciones) > 0:
+            monto_donacion = float(donaciones[0].get('monto_redondeo', 0))
+            if monto_donacion > 0:
+                tk.Label(total_frame, text=f"Donación para Tortillas: ${monto_donacion:.2f}", font=("Arial", 10, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg="#FF6B35", anchor="e").pack(anchor="e", pady=(5, 0))
+            else:
+                tk.Label(total_frame, text="Donación: No se realizó donación", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e", pady=(5, 0))
+        elif isinstance(donaciones, dict):
+            # In case it returns a single object instead of list
+            monto_donacion = float(donaciones.get('monto_redondeo', 0))
+            if monto_donacion > 0:
+                tk.Label(total_frame, text=f"Donación para Tortillas: ${monto_donacion:.2f}", font=("Arial", 10, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg="#FF6B35", anchor="e").pack(anchor="e", pady=(5, 0))
+            else:
+                tk.Label(total_frame, text="Donación: No se realizó donación", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e", pady=(5, 0))
+        else:
+            tk.Label(total_frame, text="Donación: No se realizó donación", font=("Arial", 10), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO, anchor="e").pack(anchor="e", pady=(5, 0))
 
-        tk.Label(total_frame, text=f"Total: ${venta['monto_total']:.2f}", font=("Arial", 12, "bold"), bg=self.app.COLOR_FONDO_INTERIOR, fg=self.app.COLOR_TEXTO_PRIMARIO).pack(anchor="e")
 

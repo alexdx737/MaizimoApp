@@ -49,6 +49,22 @@ class InclusionLaboralView(tk.Frame):
 
         scrollbar = tk.Scrollbar(tree_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Configure Treeview style for distinct headers
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("Treeview.Heading",
+                       background=self.app.COLOR_BOTON_FONDO,
+                       foreground="white",
+                       font=("Segoe UI", 10, "bold"),
+                       relief="flat")
+        style.map("Treeview.Heading",
+                 background=[('active', self.app.COLOR_BOTON_FONDO)])
+        style.configure("Treeview",
+                       background="white",
+                       fieldbackground="white",
+                       foreground=self.app.COLOR_TEXTO_PRIMARIO,
+                       font=("Segoe UI", 9))
 
         columnas = ("id", "nombre", "situacion", "ciclo", "fecha")
         self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", 

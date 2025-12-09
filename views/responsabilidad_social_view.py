@@ -10,11 +10,47 @@ class ResponsabilidadSocialView(tk.Frame):
         self._construir_ui()
 
     def _construir_ui(self):
-        marco = tk.Frame(self, bg=self.app.COLOR_FONDO_INTERIOR, padx=25, pady=25, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
-        marco.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
-
-        descuento_frame = tk.Frame(marco, bg=self.app.COLOR_FONDO_INTERIOR)
-        descuento_frame.pack(fill=tk.X, pady=(0, 20))
+        # Simple scrollable layout
+        canvas = tk.Canvas(self, bg=self.app.COLOR_FONDO_EXTERIOR, highlightthickness=0)
+        scrollbar_v = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=self.app.COLOR_FONDO_EXTERIOR)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="n", width=canvas.winfo_width())
+        canvas.configure(yscrollcommand=scrollbar_v.set)
+        
+        def on_canvas_resize(event):
+            canvas.itemconfig("all", width=event.width)
+        
+        canvas.bind("<Configure>", on_canvas_resize)
+        
+        # Pack scrollbar and canvas
+        scrollbar_v.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        
+        # Enable mousewheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        
+        # Content wrapper for centering
+        content_wrapper = tk.Frame(scrollable_frame, bg=self.app.COLOR_FONDO_EXTERIOR)
+        content_wrapper.pack(expand=True, fill="both", padx=20, pady=20)
+        
+        marco = tk.Frame(content_wrapper, bg=self.app.COLOR_FONDO_INTERIOR, padx=25, pady=25, relief=tk.FLAT, bd=1, highlightbackground="#D0D0D0", highlightthickness=1)
+        marco.pack(expand=True)
+        
+        # Top container - Info cards side by side
+        top_container = tk.Frame(marco, bg=self.app.COLOR_FONDO_INTERIOR)
+        top_container.pack(fill=tk.X, pady=(0, 20))
+        
+        # Left card - Descuento por No Usar Bolsa
+        descuento_frame = tk.Frame(top_container, bg=self.app.COLOR_FONDO_INTERIOR)
+        descuento_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
         tk.Label(
             descuento_frame,
@@ -42,8 +78,9 @@ class ResponsabilidadSocialView(tk.Frame):
             pady=8,
         ).pack(fill=tk.X)
 
-        redondeo_frame = tk.Frame(marco, bg=self.app.COLOR_FONDO_INTERIOR)
-        redondeo_frame.pack(fill=tk.BOTH, expand=True)
+        # Right card - Sistema de Redondeo Solidario
+        redondeo_frame = tk.Frame(top_container, bg=self.app.COLOR_FONDO_INTERIOR)
+        redondeo_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
         tk.Label(
             redondeo_frame,
@@ -87,11 +124,8 @@ class ResponsabilidadSocialView(tk.Frame):
         self.tortillas_label.pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
         
         # Botón para refrescar datos
-        btn_frame = tk.Frame(redondeo_frame, bg=self.app.COLOR_FONDO_INTERIOR)
-        btn_frame.pack(fill=tk.X, pady=(10, 0))
-        
         tk.Button(
-            btn_frame,
+            redondeo_frame,
             text="🔄 Actualizar Datos",
             font=("Arial", 10, "bold"),
             bg="#4CAF50",
@@ -100,26 +134,42 @@ class ResponsabilidadSocialView(tk.Frame):
             padx=15,
             pady=5,
             command=self.actualizar_valores
-        ).pack(side=tk.LEFT)
-
-        # Lista de donaciones
-        donaciones_frame = tk.Frame(redondeo_frame, bg=self.app.COLOR_FONDO_INTERIOR)
-        donaciones_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+        ).pack(anchor="w", pady=(5, 0))
+        
+        # Bottom container - Donation history table
+        bottom_container = tk.Frame(marco, bg=self.app.COLOR_FONDO_INTERIOR)
+        bottom_container.pack(fill=tk.BOTH, expand=True)
 
         tk.Label(
-            donaciones_frame,
+            bottom_container,
             text="Historial de Donaciones",
             font=("Arial", 11, "bold"),
             fg=self.app.COLOR_TEXTO_PRIMARIO,
             bg=self.app.COLOR_FONDO_INTERIOR,
-        ).pack(anchor="w", pady=(10, 5))
+        ).pack(anchor="w", pady=(0, 10))
 
         # Treeview container
-        tree_container = tk.Frame(donaciones_frame, bg=self.app.COLOR_FONDO_INTERIOR)
+        tree_container = tk.Frame(bottom_container, bg=self.app.COLOR_FONDO_INTERIOR)
         tree_container.pack(fill=tk.BOTH, expand=True)
 
         scrollbar = tk.Scrollbar(tree_container)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Configure Treeview style for distinct headers
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("Treeview.Heading",
+                       background=self.app.COLOR_BOTON_FONDO,
+                       foreground="white",
+                       font=("Segoe UI", 10, "bold"),
+                       relief="flat")
+        style.map("Treeview.Heading",
+                 background=[('active', self.app.COLOR_BOTON_FONDO)])
+        style.configure("Treeview",
+                       background="white",
+                       fieldbackground="white",
+                       foreground=self.app.COLOR_TEXTO_PRIMARIO,
+                       font=("Segoe UI", 9))
 
         columnas = ("id_venta", "fecha", "hora", "monto")
         self.tree = ttk.Treeview(tree_container, columns=columnas, show="headings", 

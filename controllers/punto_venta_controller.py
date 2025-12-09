@@ -272,3 +272,334 @@ class PuntoVentaController:
     def obtener_detalle_venta(self, id_venta):
         """Obtener detalle completo de una venta"""
         return self.VentaModel.obtener_venta_completa(id_venta)
+    
+    def generar_reporte_semanal(self, ruta_archivo):
+        """
+        Generar reporte semanal completo en PDF con gráficos y tablas
+        Args:
+            ruta_archivo: Ruta donde guardar el archivo PDF
+        Returns: True si se generó correctamente, False en caso contrario
+        """
+        try:
+            import pandas as pd
+            from datetime import datetime, timedelta
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+            import matplotlib.pyplot as plt
+            import matplotlib
+            matplotlib.use('Agg')
+            import io
+            
+            # Calcular rango de la semana actual
+            hoy = datetime.now().date()
+            inicio_semana = hoy - timedelta(days=hoy.weekday())
+            fin_semana = inicio_semana + timedelta(days=6)
+            
+            # Obtener ventas
+            ventas = self.VentaModel.listar_ventas(
+                fecha_inicio=inicio_semana.isoformat(),
+                fecha_fin=fin_semana.isoformat(),
+                limit=1000
+            )
+            
+            # Preparar datos con pandas
+            ventas_data = []
+            productos_data = []
+            donaciones_data = []
+            
+            for venta in ventas:
+                venta_detalle = self.VentaModel.obtener_venta_completa(venta['id_venta_completa'])
+                cliente_info = venta.get('cliente', {})
+                cliente_nombre = f"{cliente_info.get('nombre', 'General')} {cliente_info.get('apellido_paterno', '')}".strip()
+                descuento_cliente_pct = float(cliente_info.get('descuento', 0))
+                
+                subtotal_items = 0.0
+                if venta_detalle and venta_detalle.get('items'):
+                    subtotal_items = sum(item.get('subtotal', 0) for item in venta_detalle['items'])
+                
+                descuento_cliente_monto = subtotal_items * descuento_cliente_pct / 100
+                total_venta = float(venta.get('monto_total', 0))
+                descuento_bolsa_monto = max(subtotal_items - descuento_cliente_monto - total_venta, 0)
+                
+                donaciones = venta.get('donacion', [])
+                donacion_monto = 0.0
+                if isinstance(donaciones, list) and len(donaciones) > 0:
+                    donacion_monto = float(donaciones[0].get('monto_redondeo', 0))
+                elif isinstance(donaciones, dict):
+                    donacion_monto = float(donaciones.get('monto_redondeo', 0))
+                
+                ventas_data.append({
+                    'ID': venta['id_venta_completa'],
+                    'Fecha': venta.get('fecha', ''),
+                    'Cliente': cliente_nombre,
+                    'Subtotal': round(subtotal_items, 2),
+                    'Total': round(total_venta, 2),
+                    'Donación': round(donacion_monto, 2)
+                })
+                
+                if venta_detalle and venta_detalle.get('items'):
+                    for item in venta_detalle['items']:
+                        producto = item.get('producto', {})
+                        productos_data.append({
+                            'Producto': producto.get('nombre', 'N/A'),
+                            'Cantidad': item.get('cantidad_vendida', 0),
+                            'Precio': round(item.get('subtotal', 0) / item.get('cantidad_vendida', 1), 2),
+                            'Total': round(item.get('subtotal', 0), 2)
+                        })
+                
+                if donacion_monto > 0:
+                    donaciones_data.append({
+                        'ID': venta['id_venta_completa'],
+                        'Cliente': cliente_nombre,
+                        'Monto': round(donacion_monto, 2)
+                    })
+            
+            df_ventas = pd.DataFrame(ventas_data)
+            df_productos = pd.DataFrame(productos_data)
+            df_donaciones = pd.DataFrame(donaciones_data)
+            
+            # Crear PDF
+            doc = SimpleDocTemplate(ruta_archivo, pagesize=letter)
+            story = []
+            styles = getSampleStyleSheet()
+            
+            # Estilos personalizados
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                textColor=colors.HexColor('#2C3E50'),
+                spaceAfter=30,
+                alignment=TA_CENTER
+            )
+            
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontSize=16,
+                textColor=colors.HexColor('#34495E'),
+                spaceAfter=12,
+                spaceBefore=12
+            )
+            
+            # ===== PORTADA =====
+            story.append(Spacer(1, 2*inch))
+            story.append(Paragraph("REPORTE SEMANAL DE VENTAS", title_style))
+            story.append(Spacer(1, 0.3*inch))
+            story.append(Paragraph(f"Semana del {inicio_semana.strftime('%d/%m/%Y')} al {fin_semana.strftime('%d/%m/%Y')}", styles['Normal']))
+            story.append(Spacer(1, 0.2*inch))
+            story.append(Paragraph(f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+            story.append(PageBreak())
+            
+            # ===== RESUMEN EJECUTIVO =====
+            story.append(Paragraph("RESUMEN EJECUTIVO", heading_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            metricas = [
+                ['Métrica', 'Valor'],
+                ['Total de Ventas', str(len(ventas))],
+                ['Ingresos Totales', f"${df_ventas['Total'].sum():.2f}" if not df_ventas.empty else "$0.00"],
+                ['Donaciones Recibidas', f"${df_ventas['Donación'].sum():.2f}" if not df_ventas.empty else "$0.00"],
+                ['Ticket Promedio', f"${df_ventas['Total'].mean():.2f}" if not df_ventas.empty else "$0.00"],
+                ['Productos Vendidos', str(len(df_productos))]
+            ]
+            
+            t = Table(metricas, colWidths=[3*inch, 2*inch])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498DB')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(t)
+            story.append(PageBreak())
+            
+            # ===== GRÁFICOS =====
+            story.append(Paragraph("ANÁLISIS VISUAL", heading_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Gráfico 1: Ventas por Cliente
+            if not df_ventas.empty:
+                df_por_cliente = df_ventas.groupby('Cliente')['Total'].sum().sort_values(ascending=False).head(10)
+                
+                fig, ax = plt.subplots(figsize=(8, 5))
+                df_por_cliente.plot(kind='barh', ax=ax, color='#3498DB')
+                ax.set_xlabel('Total Vendido ($)', fontweight='bold')
+                ax.set_title('Top 10 Clientes por Ventas', fontweight='bold', fontsize=14)
+                ax.grid(axis='x', alpha=0.3)
+                plt.tight_layout()
+                
+                img_buffer = io.BytesIO()
+                plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+                img_buffer.seek(0)
+                img = Image(img_buffer, width=6*inch, height=3.5*inch)
+                story.append(img)
+                plt.close()
+                story.append(Spacer(1, 0.3*inch))
+            
+            # Gráfico 2: Top Productos
+            if not df_productos.empty:
+                df_top_prod = df_productos.groupby('Producto')['Total'].sum().sort_values(ascending=False).head(10)
+                
+                fig, ax = plt.subplots(figsize=(8, 5))
+                df_top_prod.plot(kind='barh', ax=ax, color='#2ECC71')
+                ax.set_xlabel('Ingresos ($)', fontweight='bold')
+                ax.set_title('Top 10 Productos Más Vendidos', fontweight='bold', fontsize=14)
+                ax.grid(axis='x', alpha=0.3)
+                plt.tight_layout()
+                
+                img_buffer = io.BytesIO()
+                plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+                img_buffer.seek(0)
+                img = Image(img_buffer, width=6*inch, height=3.5*inch)
+                story.append(img)
+                plt.close()
+            
+            story.append(PageBreak())
+            
+            # Gráfico 3: Distribución
+            if not df_ventas.empty:
+                total_ventas_sum = df_ventas['Total'].sum()
+                total_donaciones_sum = df_ventas['Donación'].sum()
+                
+                fig, ax = plt.subplots(figsize=(7, 5))
+                sizes = [total_ventas_sum, total_donaciones_sum]
+                labels = [f'Ventas\n${total_ventas_sum:.2f}', f'Donaciones\n${total_donaciones_sum:.2f}']
+                colors_pie = ['#3498DB', '#F39C12']
+                
+                ax.pie(sizes, labels=labels, colors=colors_pie, autopct='%1.1f%%',
+                      startangle=90, textprops={'fontsize': 11, 'fontweight': 'bold'})
+                ax.set_title('Distribución de Ingresos', fontweight='bold', fontsize=14)
+                plt.tight_layout()
+                
+                img_buffer = io.BytesIO()
+                plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+                img_buffer.seek(0)
+                img = Image(img_buffer, width=5*inch, height=4*inch)
+                story.append(img)
+                plt.close()
+            
+            story.append(PageBreak())
+            
+            # ===== TABLAS DETALLADAS =====
+            story.append(Paragraph("VENTAS DETALLADAS", heading_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            if not df_ventas.empty:
+                ventas_table_data = [['ID', 'Fecha', 'Cliente', 'Subtotal', 'Total', 'Donación']]
+                for _, row in df_ventas.iterrows():
+                    ventas_table_data.append([
+                        str(row['ID']),
+                        row['Fecha'],
+                        row['Cliente'][:20],
+                        f"${row['Subtotal']:.2f}",
+                        f"${row['Total']:.2f}",
+                        f"${row['Donación']:.2f}"
+                    ])
+                
+                t = Table(ventas_table_data, colWidths=[0.6*inch, 1*inch, 2*inch, 1*inch, 1*inch, 1*inch])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2ECC71')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
+                ]))
+                story.append(t)
+            
+            story.append(PageBreak())
+            
+            # Tabla de Productos
+            story.append(Paragraph("PRODUCTOS VENDIDOS", heading_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            if not df_productos.empty:
+                prod_table_data = [['Producto', 'Cantidad', 'Precio Unit.', 'Total']]
+                for _, row in df_productos.head(50).iterrows():
+                    prod_table_data.append([
+                        row['Producto'][:30],
+                        str(row['Cantidad']),
+                        f"${row['Precio']:.2f}",
+                        f"${row['Total']:.2f}"
+                    ])
+                
+                t = Table(prod_table_data, colWidths=[3*inch, 1*inch, 1.2*inch, 1.2*inch])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E74C3C')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
+                ]))
+                story.append(t)
+            
+            # Tabla de Donaciones
+            if not df_donaciones.empty:
+                story.append(PageBreak())
+                story.append(Paragraph("DONACIONES REGISTRADAS", heading_style))
+                story.append(Spacer(1, 0.2*inch))
+                
+                don_table_data = [['ID Venta', 'Cliente', 'Monto Donado']]
+                for _, row in df_donaciones.iterrows():
+                    don_table_data.append([
+                        str(row['ID']),
+                        row['Cliente'][:30],
+                        f"${row['Monto']:.2f}"
+                    ])
+                
+                don_table_data.append(['', 'TOTAL:', f"${df_donaciones['Monto'].sum():.2f}"])
+                
+                t = Table(don_table_data, colWidths=[1*inch, 3.5*inch, 1.5*inch])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F39C12')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.lightgrey]),
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F39C12')),
+                    ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
+                    ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
+                ]))
+                story.append(t)
+            
+            # Construir PDF
+            doc.build(story)
+            
+            print(f"✓ Reporte PDF generado: {ruta_archivo}")
+            print(f"  - {len(ventas)} ventas procesadas")
+            print(f"  - {len(df_productos)} productos vendidos")
+            print(f"  - {len(df_donaciones)} donaciones registradas")
+            return True
+            
+        except Exception as e:
+            print(f"Error generando reporte PDF: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+            print(f"  - {len(df_donaciones)} donaciones registradas")
+            return True
+            
+        except Exception as e:
+            print(f"Error generando reporte PDF: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+            return False
