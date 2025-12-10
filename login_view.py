@@ -129,6 +129,12 @@ class LoginView:
         try:
             user = UsuarioModel.validar_credenciales(usuario_val, password_val)
             if user:
+                # Obtener el nombre del empleado
+                nombre_usuario = user.get('empleado', {}).get('nombre', f"Usuario {user['id_usuario']}")
+                
+                # Mostrar mensaje de bienvenida
+                messagebox.showinfo("Bienvenido", 
+                                  f"¡Bienvenido(a) {nombre_usuario}!\n\nRol: {user['rol']}")
                 # Transición suave (opcional) o mensaje
                 self.root.destroy()
                 run_main_app(usuario_data=user)
